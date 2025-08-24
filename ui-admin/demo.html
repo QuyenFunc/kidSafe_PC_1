@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KidSafe PC - Fluent Design Demo</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --fluent-blue: #0078d4;
+            --fluent-blue-hover: #106ebe;
+            --fluent-blue-pressed: #005a9e;
+            --fluent-neutral-background: #fafafa;
+            --fluent-card-background: rgba(255, 255, 255, 0.7);
+            --fluent-surface: #ffffff;
+            --fluent-border: #e1e1e1;
+            --fluent-text-primary: #323130;
+            --fluent-text-secondary: #605e5c;
+            --fluent-accent: #0078d4;
+            --fluent-success: #107c10;
+            --fluent-warning: #ff8c00;
+            --fluent-danger: #d13438;
+            --fluent-shadow-2: 0 2px 4px rgba(0,0,0,0.08);
+            --fluent-shadow-4: 0 4px 8px rgba(0,0,0,0.12);
+            --fluent-shadow-8: 0 8px 16px rgba(0,0,0,0.16);
+            --fluent-border-radius: 8px;
+            --fluent-border-radius-large: 12px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            color: var(--fluent-text-primary);
+            overflow-x: hidden;
+        }
+
+        .app-container {
+            display: flex;
+            min-height: 100vh;
+            backdrop-filter: blur(20px);
+        }
+
+        .sidebar {
+            width: 280px;
+            background: var(--fluent-card-background);
+            backdrop-filter: blur(30px);
+            border-right: 1px solid var(--fluent-border);
+            box-shadow: var(--fluent-shadow-8);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .sidebar::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(0, 120, 212, 0.1) 0%, rgba(102, 126, 234, 0.05) 100%);
+            pointer-events: none;
+        }
+
+        .sidebar-header {
+            padding: 24px 20px;
+            border-bottom: 1px solid var(--fluent-border);
+            background: var(--fluent-surface);
+            position: relative;
+            z-index: 1;
+        }
+
+        .sidebar-header h1 {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--fluent-text-primary);
+            margin-bottom: 4px;
+        }
+
+        .sidebar-header p {
+            font-size: 14px;
+            color: var(--fluent-text-secondary);
+            margin: 0;
+        }
+
+        .nav-menu {
+            flex: 1;
+            padding: 12px 0;
+            position: relative;
+            z-index: 1;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 20px;
+            margin: 4px 12px;
+            border-radius: var(--fluent-border-radius);
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+            color: var(--fluent-text-primary);
+            text-decoration: none;
+            font-weight: 500;
+            position: relative;
+        }
+
+        .nav-item:hover {
+            background: rgba(0, 120, 212, 0.1);
+            transform: translateX(4px);
+        }
+
+        .nav-item.active {
+            background: var(--fluent-accent);
+            color: white;
+            box-shadow: var(--fluent-shadow-4);
+        }
+
+        .nav-item i {
+            width: 20px;
+            margin-right: 12px;
+            font-size: 16px;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: var(--fluent-neutral-background);
+        }
+
+        .header {
+            background: var(--fluent-surface);
+            padding: 20px 32px;
+            border-bottom: 1px solid var(--fluent-border);
+            box-shadow: var(--fluent-shadow-2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h2 {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--fluent-text-primary);
+        }
+
+        .content {
+            padding: 32px;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background: var(--fluent-card-background);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--fluent-border);
+            border-radius: var(--fluent-border-radius-large);
+            padding: 24px;
+            box-shadow: var(--fluent-shadow-4);
+            transition: all 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--fluent-accent), var(--fluent-blue-hover));
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--fluent-shadow-8);
+        }
+
+        .stat-card-content {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .stat-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: var(--fluent-border-radius-large);
+            background: linear-gradient(135deg, var(--fluent-accent), var(--fluent-blue-hover));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+            box-shadow: var(--fluent-shadow-4);
+        }
+
+        .stat-details h3 {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--fluent-text-primary);
+            margin-bottom: 4px;
+            line-height: 1;
+        }
+
+        .stat-details p {
+            font-size: 14px;
+            color: var(--fluent-text-secondary);
+            margin: 0;
+            font-weight: 500;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 20px;
+            border: none;
+            border-radius: var(--fluent-border-radius);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s cubic-bezier(0.23, 1, 0.32, 1);
+            text-decoration: none;
+            box-shadow: var(--fluent-shadow-2);
+            position: relative;
+            overflow: hidden;
+            background: var(--fluent-accent);
+            color: white;
+        }
+
+        .btn:hover {
+            background: var(--fluent-blue-hover);
+            transform: translateY(-2px);
+            box-shadow: var(--fluent-shadow-4);
+        }
+
+        .action-group {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin: 16px 0;
+            justify-content: center;
+        }
+
+        .demo-info {
+            background: var(--fluent-card-background);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--fluent-border);
+            border-radius: var(--fluent-border-radius-large);
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: var(--fluent-shadow-4);
+            border-left: 4px solid var(--fluent-accent);
+        }
+
+        .demo-info h3 {
+            color: var(--fluent-accent);
+            margin-bottom: 12px;
+        }
+
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .feature-list li {
+            padding: 8px 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .feature-list li i {
+            color: var(--fluent-success);
+            width: 20px;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-in {
+            animation: slideIn 0.6s ease-out;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h1><i class="fas fa-shield-alt"></i> KidSafe PC</h1>
+                <p>Parental Control System</p>
+            </div>
+            
+            <div class="nav-menu">
+                <div class="nav-item active">
+                    <i class="fas fa-chart-pie"></i>
+                    <span>Dashboard</span>
+                </div>
+                <div class="nav-item">
+                    <i class="fas fa-ban"></i>
+                    <span>Block Rules</span>
+                </div>
+                <div class="nav-item">
+                    <i class="fas fa-list-alt"></i>
+                    <span>DNS Logs</span>
+                </div>
+                <div class="nav-item">
+                    <i class="fas fa-cog"></i>
+                    <span>System Status</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <div class="header">
+                <h2>Dashboard</h2>
+                <div class="header-actions">
+                    <button class="btn">
+                        <i class="fas fa-sync-alt"></i>
+                        Refresh
+                    </button>
+                </div>
+            </div>
+            
+            <div class="content">
+                <div class="demo-info animate-in">
+                    <h3><i class="fas fa-star"></i> Fluent Design Features Applied</h3>
+                    <ul class="feature-list">
+                        <li><i class="fas fa-check"></i> Acrylic blur effects với backdrop-filter</li>
+                        <li><i class="fas fa-check"></i> Fluent Design color palette</li>
+                        <li><i class="fas fa-check"></i> Modern shadows và depth layers</li>
+                        <li><i class="fas fa-check"></i> Smooth animations và transitions</li>
+                        <li><i class="fas fa-check"></i> Typography theo Segoe UI system font</li>
+                        <li><i class="fas fa-check"></i> Hover effects và micro-interactions</li>
+                        <li><i class="fas fa-check"></i> Responsive card-based layout</li>
+                        <li><i class="fas fa-check"></i> Consistent spacing và border radius</li>
+                    </ul>
+                </div>
+                
+                <div class="stats-grid animate-in">
+                    <div class="stat-card">
+                        <div class="stat-card-content">
+                            <div class="stat-icon">
+                                <i class="fas fa-shield-alt"></i>
+                            </div>
+                            <div class="stat-details">
+                                <h3>24</h3>
+                                <p>Active Rules</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-content">
+                            <div class="stat-icon">
+                                <i class="fas fa-ban"></i>
+                            </div>
+                            <div class="stat-details">
+                                <h3>156</h3>
+                                <p>Blocked Today</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-content">
+                            <div class="stat-icon">
+                                <i class="fas fa-heartbeat"></i>
+                            </div>
+                            <div class="stat-details">
+                                <h3>Running</h3>
+                                <p>System Status</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="action-group animate-in">
+                    <button class="btn">
+                        <i class="fas fa-sync-alt"></i>
+                        Refresh Stats
+                    </button>
+                    <button class="btn">
+                        <i class="fas fa-cog"></i>
+                        Configure System
+                    </button>
+                    <button class="btn">
+                        <i class="fas fa-undo"></i>
+                        Restore System
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Add animations on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            const elements = document.querySelectorAll('.stat-card, .nav-item');
+            elements.forEach((el, index) => {
+                setTimeout(() => {
+                    el.style.opacity = '0';
+                    el.style.transform = 'translateY(20px)';
+                    el.style.transition = 'all 0.6s ease-out';
+                    
+                    setTimeout(() => {
+                        el.style.opacity = '1';
+                        el.style.transform = 'translateY(0)';
+                    }, 100);
+                }, index * 100);
+            });
+        });
+
+        // Add interactive effects
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', () => {
+                document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
+                item.classList.add('active');
+            });
+        });
+    </script>
+</body>
+</html>

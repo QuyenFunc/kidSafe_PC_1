@@ -1,0 +1,67 @@
+{
+  "name": "kidsafe-pc",
+  "version": "1.0.0",
+  "description": "KidSafe PC - Professional Parental Control",
+  "main": "main.js",
+  "author": "KidSafe Technologies",
+  "homepage": "https://kidsafe-pc.com",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win --x64",
+    "build-core": "node build-core.js",
+    "dev": "npm run build-core && npm start",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "dependencies": {
+    "axios": "^1.4.0"
+  },
+  "devDependencies": {
+    "electron": "^27.0.0",
+    "electron-builder": "^24.0.0"
+  },
+  "build": {
+    "appId": "com.kidsafe.pc",
+    "productName": "KidSafe PC",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
+      "!**/node_modules/**/*.{md,txt,map,ts}",
+      "!**/node_modules/**/test/**",
+      "!**/node_modules/**/tests/**",
+      "!**/node_modules/**/.git*",
+      "!**/node_modules/**/example*",
+      "!**/node_modules/**/demo*",
+      "parental-control-core.exe"
+    ],
+    "extraFiles": [
+      {
+        "from": "parental-control-core.exe",
+        "to": "parental-control-core.exe"
+      }
+    ],
+    "win": {
+      "target": {
+        "target": "nsis",
+        "arch": [
+          "x64"
+        ]
+      },
+      "icon": "assets/icon.ico",
+      "requestedExecutionLevel": "requireAdministrator",
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "compression": "maximum",
+    "nsis": {
+      "oneClick": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "KidSafe PC"
+    }
+  }
+}

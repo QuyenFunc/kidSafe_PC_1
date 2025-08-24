@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KidSafe PC - Parental Control</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --fluent-blue: #0078d4;
+            --fluent-blue-hover: #106ebe;
+            --fluent-blue-pressed: #005a9e;
+            --fluent-neutral-background: #fafafa;
+            --fluent-card-background: rgba(255, 255, 255, 0.7);
+            --fluent-surface: #ffffff;
+            --fluent-border: #e1e1e1;
+            --fluent-text-primary: #323130;
+            --fluent-text-secondary: #605e5c;
+            --fluent-accent: #0078d4;
+            --fluent-success: #107c10;
+            --fluent-warning: #ff8c00;
+            --fluent-danger: #d13438;
+            --fluent-shadow-2: 0 2px 4px rgba(0,0,0,0.08);
+            --fluent-shadow-4: 0 4px 8px rgba(0,0,0,0.12);
+            --fluent-shadow-8: 0 8px 16px rgba(0,0,0,0.16);
+            --fluent-border-radius: 8px;
+            --fluent-border-radius-large: 12px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            color: var(--fluent-text-primary);
+            overflow-x: hidden;
+        }
+        .app-container {
+            display: flex;
+            min-height: 100vh;
+            backdrop-filter: blur(20px);
+        }
+
+        /* Sidebar với Fluent Design */
+        .sidebar {
+            width: 280px;
+            background: var(--fluent-card-background);
+            backdrop-filter: blur(30px);
+            border-right: 1px solid var(--fluent-border);
+            box-shadow: var(--fluent-shadow-8);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .sidebar::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(0, 120, 212, 0.1) 0%, rgba(102, 126, 234, 0.05) 100%);
+            pointer-events: none;
+        }
+
+        .sidebar-header {
+            padding: 24px 20px;
+            border-bottom: 1px solid var(--fluent-border);
+            background: var(--fluent-surface);
+            position: relative;
+            z-index: 1;
+        }
+
+        .sidebar-header h1 {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--fluent-text-primary);
+            margin-bottom: 4px;
+        }
+
+        .sidebar-header p {
+            font-size: 14px;
+            color: var(--fluent-text-secondary);
+            margin: 0;
+        }
+
+        .nav-menu {
+            flex: 1;
+            padding: 12px 0;
+            position: relative;
+            z-index: 1;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 20px;
+            margin: 4px 12px;
+            border-radius: var(--fluent-border-radius);
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+            color: var(--fluent-text-primary);
+            text-decoration: none;
+            font-weight: 500;
+            position: relative;
+        }
+
+        .nav-item:hover {
+            background: rgba(0, 120, 212, 0.1);
+            transform: translateX(4px);
+        }
+
+        .nav-item.active {
+            background: var(--fluent-accent);
+            color: white;
+            box-shadow: var(--fluent-shadow-4);
+        }
+
+        .nav-item i {
+            width: 20px;
+            margin-right: 12px;
+            font-size: 16px;
+        }
+
+        /* Main Content Area */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: var(--fluent-neutral-background);
+        }
+
+        .header {
+            background: var(--fluent-surface);
+            padding: 20px 32px;
+            border-bottom: 1px solid var(--fluent-border);
+            box-shadow: var(--fluent-shadow-2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h2 {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--fluent-text-primary);
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 12px;
+        }
+        .content {
+            padding: 32px;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Fluent Cards & Stats */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background: var(--fluent-card-background);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--fluent-border);
+            border-radius: var(--fluent-border-radius-large);
+            padding: 24px;
+            box-shadow: var(--fluent-shadow-4);
+            transition: all 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--fluent-accent), var(--fluent-blue-hover));
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--fluent-shadow-8);
+        }
+
+        .stat-card-content {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .stat-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: var(--fluent-border-radius-large);
+            background: linear-gradient(135deg, var(--fluent-accent), var(--fluent-blue-hover));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+            box-shadow: var(--fluent-shadow-4);
+        }
+
+        .stat-details h3 {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--fluent-text-primary);
+            margin-bottom: 4px;
+            line-height: 1;
+        }
+
+        .stat-details p {
+            font-size: 14px;
+            color: var(--fluent-text-secondary);
+            margin: 0;
+            font-weight: 500;
+        }
+
+        /* Fluent Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 20px;
+            border: none;
+            border-radius: var(--fluent-border-radius);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s cubic-bezier(0.23, 1, 0.32, 1);
+            text-decoration: none;
+            box-shadow: var(--fluent-shadow-2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn:hover::before {
+            left: 100%;
+        }
+
+        .btn-primary {
+            background: var(--fluent-accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--fluent-blue-hover);
+            transform: translateY(-2px);
+            box-shadow: var(--fluent-shadow-4);
+        }
+
+        .btn-primary:active {
+            background: var(--fluent-blue-pressed);
+            transform: translateY(0);
+        }
+
+        .btn-danger {
+            background: var(--fluent-danger);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #b12a2e;
+            transform: translateY(-2px);
+            box-shadow: var(--fluent-shadow-4);
+        }
+
+        .btn-success {
+            background: var(--fluent-success);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #0e6a0e;
+            transform: translateY(-2px);
+            box-shadow: var(--fluent-shadow-4);
+        }
+        /* Fluent Forms */
+        .form-section {
+            background: var(--fluent-card-background);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--fluent-border);
+            border-radius: var(--fluent-border-radius-large);
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: var(--fluent-shadow-4);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--fluent-text-primary);
+            font-size: 14px;
+        }
+
+        .form-group input, 
+        .form-group select, 
+        .form-group textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid var(--fluent-border);
+            border-radius: var(--fluent-border-radius);
+            font-size: 14px;
+            font-family: inherit;
+            background: var(--fluent-surface);
+            color: var(--fluent-text-primary);
+            transition: all 0.15s ease;
+            box-sizing: border-box;
+        }
+
+        .form-group input:focus, 
+        .form-group select:focus, 
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--fluent-accent);
+            box-shadow: 0 0 0 1px var(--fluent-accent);
+        }
+
+        /* Fluent Tables */
+        .table-container {
+            background: var(--fluent-card-background);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--fluent-border);
+            border-radius: var(--fluent-border-radius-large);
+            overflow: hidden;
+            box-shadow: var(--fluent-shadow-4);
+            margin-bottom: 24px;
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            background: transparent;
+        }
+
+        .table th {
+            background: var(--fluent-surface);
+            padding: 16px 20px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--fluent-text-primary);
+            border-bottom: 2px solid var(--fluent-border);
+            font-size: 14px;
+        }
+
+        .table td {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--fluent-border);
+            color: var(--fluent-text-primary);
+            font-size: 14px;
+        }
+
+        .table tr:hover {
+            background: rgba(0, 120, 212, 0.05);
+        }
+
+        /* Fluent Status Badges */
+        .status {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 12px;
+            border-radius: 16px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status.success {
+            background: rgba(16, 124, 16, 0.1);
+            color: var(--fluent-success);
+            border: 1px solid rgba(16, 124, 16, 0.2);
+        }
+
+        .status.danger {
+            background: rgba(209, 52, 56, 0.1);
+            color: var(--fluent-danger);
+            border: 1px solid rgba(209, 52, 56, 0.2);
+        }
+
+        .status.warning {
+            background: rgba(255, 140, 0, 0.1);
+            color: var(--fluent-warning);
+            border: 1px solid rgba(255, 140, 0, 0.2);
+        }
+
+        /* Log Entries */
+        .log-container {
+            background: var(--fluent-card-background);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--fluent-border);
+            border-radius: var(--fluent-border-radius-large);
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 16px;
+            box-shadow: var(--fluent-shadow-4);
+        }
+
+        .log-entry {
+            padding: 12px 16px;
+            margin: 8px 0;
+            border-radius: var(--fluent-border-radius);
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            border-left: 4px solid;
+            background: var(--fluent-surface);
+            box-shadow: var(--fluent-shadow-2);
+            transition: all 0.15s ease;
+        }
+
+        .log-entry:hover {
+            transform: translateX(4px);
+        }
+
+        .log-allowed {
+            border-left-color: var(--fluent-success);
+            background: rgba(16, 124, 16, 0.05);
+        }
+
+        .log-blocked {
+            border-left-color: var(--fluent-danger);
+            background: rgba(209, 52, 56, 0.05);
+        }
+
+        /* Section Headers */
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid var(--fluent-border);
+        }
+
+        .section-header h3 {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--fluent-text-primary);
+            margin: 0;
+        }
+
+        /* Action Groups */
+        .action-group {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin: 16px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h1><i class="fas fa-shield-alt"></i> KidSafe PC</h1>
+                <p>Parental Control System</p>
+                <div class="user-info" id="userInfo" style="display: none; margin-top: 10px; font-size: 0.8rem; color: #666;">
+                    <i class="fas fa-user"></i>
+                    <span id="userEmail">Chưa đăng nhập</span>
+                </div>
+            </div>
+            
+            <div class="nav-menu">
+                <div class="nav-item active" onclick="showTab('dashboard')">
+                    <i class="fas fa-chart-pie"></i>
+                    <span>Dashboard</span>
+                </div>
+                <div class="nav-item" onclick="showTab('rules')">
+                    <i class="fas fa-ban"></i>
+                    <span>Block Rules</span>
+                </div>
+                <div class="nav-item" onclick="showTab('logs')">
+                    <i class="fas fa-list-alt"></i>
+                    <span>DNS Logs</span>
+                </div>
+                <div class="nav-item" onclick="showTab('system')">
+                    <i class="fas fa-cog"></i>
+                    <span>System Status</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="header">
+                <h2 id="page-title">Dashboard</h2>
+                <div class="header-actions">
+                    <button class="btn btn-primary" onclick="refreshStats()">
+                        <i class="fas fa-sync-alt"></i>
+                        Refresh
+                    </button>
+                </div>
+        </div>
+        
+        <div class="content">
+            <!-- Dashboard Tab -->
+            <div id="dashboard" class="tab-content active">
+                    <div class="section-header">
+                        <h3>System Overview</h3>
+                    </div>
+                    
+                <div class="stats-grid">
+                    <div class="stat-card">
+                            <div class="stat-card-content">
+                                <div class="stat-icon">
+                                    <i class="fas fa-shield-alt"></i>
+                                </div>
+                                <div class="stat-details">
+                                    <h3 id="totalRules">-</h3>
+                                    <p>Active Rules</p>
+                                </div>
+                            </div>
+                    </div>
+                    <div class="stat-card">
+                            <div class="stat-card-content">
+                                <div class="stat-icon">
+                                    <i class="fas fa-ban"></i>
+                                </div>
+                                <div class="stat-details">
+                                    <h3 id="blockedToday">-</h3>
+                                    <p>Blocked Today</p>
+                                </div>
+                            </div>
+                    </div>
+                    <div class="stat-card">
+                            <div class="stat-card-content">
+                                <div class="stat-icon">
+                                    <i class="fas fa-heartbeat"></i>
+                                </div>
+                                <div class="stat-details">
+                                    <h3 id="systemStatus">Running</h3>
+                                    <p>System Status</p>
+                                </div>
+                            </div>
+                    </div>
+                </div>
+                
+                    <div class="action-group" style="justify-content: center; margin-top: 32px;">
+                        <button class="btn btn-primary" onclick="refreshStats()">
+                            <i class="fas fa-sync-alt"></i>
+                            Refresh Stats
+                        </button>
+                        <button class="btn btn-success" onclick="configureSystem()">
+                            <i class="fas fa-cog"></i>
+                            Configure System
+                        </button>
+                        <button class="btn btn-danger" onclick="restoreSystem()">
+                            <i class="fas fa-undo"></i>
+                            Restore System
+                        </button>
+                </div>
+            </div>
+            
+            <!-- Rules Tab -->
+            <div id="rules" class="tab-content">
+                    <div class="section-header">
+                        <h3>Blocking Rules</h3>
+                        <button class="btn btn-primary" onclick="document.getElementById('addRuleForm').scrollIntoView()">
+                            <i class="fas fa-plus"></i>
+                            Add Rule
+                        </button>
+                    </div>
+                    
+                    <div class="form-section">
+                        <h4 style="margin-bottom: 20px; color: var(--fluent-text-primary);">
+                            <i class="fas fa-plus-circle"></i>
+                            Add New Blocking Rule
+                        </h4>
+                    <form id="addRuleForm">
+                        <div class="form-group">
+                            <label>Domain:</label>
+                            <input type="text" id="ruleDomain" placeholder="example.com" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Category:</label>
+                            <select id="ruleCategory">
+                                <option value="adult">Adult Content</option>
+                                <option value="social">Social Media</option>
+                                <option value="gaming">Gaming</option>
+                                <option value="streaming">Video Streaming</option>
+                                <option value="malware">Malware/Phishing</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Reason:</label>
+                                <input type="text" id="ruleReason" placeholder="Optional reason for blocking">
+                            </div>
+                            <div class="action-group">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-plus"></i>
+                                    Add Rule
+                                </button>
+                                <button type="reset" class="btn" style="background: var(--fluent-border); color: var(--fluent-text-primary);">
+                                    <i class="fas fa-times"></i>
+                                    Clear
+                                </button>
+                        </div>
+                    </form>
+                </div>
+                
+                    <div class="table-container">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                    <th><i class="fas fa-globe"></i> Domain</th>
+                                    <th><i class="fas fa-tags"></i> Category</th>
+                                    <th><i class="fas fa-comment"></i> Reason</th>
+                                    <th><i class="fas fa-calendar"></i> Created</th>
+                                    <th><i class="fas fa-cog"></i> Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rulesTableBody">
+                            <tr>
+                                    <td colspan="5" style="text-align: center; padding: 40px; color: var(--fluent-text-secondary);">
+                                        <i class="fas fa-spinner fa-spin" style="margin-right: 8px;"></i>
+                                        Loading rules...
+                                    </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Logs Tab -->
+            <div id="logs" class="tab-content">
+                    <div class="section-header">
+                        <h3>DNS Query Logs</h3>
+                        <div class="action-group">
+                            <button class="btn btn-primary" onclick="refreshLogs()">
+                                <i class="fas fa-sync-alt"></i>
+                                Refresh
+                            </button>
+                            <button class="btn btn-danger" onclick="clearLogs()">
+                                <i class="fas fa-trash"></i>
+                                Clear Logs
+                            </button>
+                        </div>
+                </div>
+                
+                    <p style="color: var(--fluent-text-secondary); margin-bottom: 24px;">
+                        <i class="fas fa-info-circle"></i>
+                        Real-time monitoring of DNS queries and blocking actions.
+                    </p>
+                    
+                    <div class="log-container" id="logsContainer">
+                        <div style="text-align: center; color: var(--fluent-text-secondary); padding: 40px;">
+                            <i class="fas fa-spinner fa-spin" style="margin-right: 8px;"></i>
+                            Loading logs...
+                        </div>
+                </div>
+            </div>
+            
+            <!-- System Tab -->
+            <div id="system" class="tab-content">
+                    <div class="section-header">
+                        <h3>System Configuration</h3>
+                        <button class="btn btn-primary" onclick="checkSystemStatus()">
+                            <i class="fas fa-search"></i>
+                            Check Status
+                        </button>
+                    </div>
+                
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-card-content">
+                            <div class="stat-icon">
+                                <i class="fas fa-file-alt"></i>
+                            </div>
+                            <div class="stat-details">
+                                <h3>Hosts File</h3>
+                                <p><span class="status success" id="hostsStatus">Active</span></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-content">
+                            <div class="stat-icon">
+                                <i class="fas fa-shield-alt"></i>
+                            </div>
+                            <div class="stat-details">
+                                <h3>Blocked Domains</h3>
+                                <p><span class="status" id="blockedCount">0</span></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-content">
+                            <div class="stat-icon">
+                                <i class="fas fa-cogs"></i>
+                            </div>
+                            <div class="stat-details">
+                                <h3>Method</h3>
+                                <p><span class="status success">Hosts File</span></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="action-group" style="justify-content: center; margin: 32px 0;">
+                        <button class="btn btn-success" onclick="configureSystem()">
+                            <i class="fas fa-sync"></i>
+                            Apply Rules to Hosts
+                        </button>
+                        <button class="btn btn-danger" onclick="restoreSystem()">
+                            <i class="fas fa-undo"></i>
+                            Restore Original Hosts
+                        </button>
+                </div>
+
+                <div class="form-section">
+                    <h4 style="margin-bottom: 16px;">
+                        <i class="fas fa-bug"></i>
+                        Debug & Testing
+                    </h4>
+                    <div class="action-group">
+                        <button class="btn btn-primary" onclick="verifyHosts()">
+                            <i class="fas fa-search"></i>
+                            Verify Hosts File
+                        </button>
+                        <input type="text" id="testDomain" placeholder="Enter domain to test (e.g. facebook.com)" style="flex: 1; padding: 12px; border: 1px solid var(--fluent-border); border-radius: var(--fluent-border-radius);">
+                        <button class="btn btn-primary" onclick="testBlocking()">
+                            <i class="fas fa-vial"></i>
+                            Test Blocking
+                        </button>
+                    </div>
+                    <div id="debugResults" style="margin-top: 16px; padding: 12px; background: var(--fluent-neutral-background); border-radius: var(--fluent-border-radius); font-family: monospace; font-size: 12px; display: none;">
+                    </div>
+                </div>
+                
+                <!-- Strict Mode removed - using simple hosts-only approach -->
+                
+                    <div class="form-section" style="background: rgba(52, 199, 89, 0.1); border-left: 4px solid var(--fluent-success);">
+                        <h4 style="color: var(--fluent-success); margin-bottom: 16px;">
+                            <i class="fas fa-check-circle"></i>
+                            Hosts File Method - Safe & Simple
+                        </h4>
+                        <ul style="color: var(--fluent-text-primary); margin: 0; padding-left: 20px;">
+                        <li>✅ Uses Windows hosts file (C:\Windows\System32\drivers\etc\hosts)</li>
+                        <li>✅ No DNS server or firewall modifications needed</li>
+                        <li>✅ No network connectivity issues</li>
+                        <li>✅ Works with any DNS provider (Cloudflare, Google, etc.)</li>
+                        <li>✅ Original hosts file backed up and restored on exit</li>
+                        <li>✅ Requires Administrator privileges only for hosts file access</li>
+                    </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { ipcRenderer } = require('electron');
+        
+        // Tab switching with improved UI feedback
+        function showTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.nav-item').forEach(nav => {
+                nav.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+            
+            // Update page title
+            const titles = {
+                'dashboard': 'Dashboard',
+                'rules': 'Block Rules',
+                'logs': 'DNS Logs',
+                'system': 'System Status'
+            };
+            document.getElementById('page-title').textContent = titles[tabName];
+            
+            // Load data for the tab
+            switch(tabName) {
+                case 'dashboard':
+                    refreshStats();
+                    break;
+                case 'rules':
+                    loadRules();
+                    break;
+                case 'logs':
+                    refreshLogs();
+                    break;
+                case 'system':
+                    checkSystemStatus();
+                    break;
+            }
+        }
+        
+        // Dashboard functions
+        async function refreshStats() {
+            try {
+                const stats = await ipcRenderer.invoke('get-stats');
+                if (stats.error) {
+                    document.getElementById('totalRules').textContent = 'Error';
+                    document.getElementById('blockedToday').textContent = 'Error';
+                    document.getElementById('systemStatus').textContent = 'Error';
+                } else {
+                    document.getElementById('totalRules').textContent = stats.total_rules || 0;
+                    document.getElementById('blockedToday').textContent = stats.blocked_today || 0;
+                    document.getElementById('systemStatus').textContent = 'Running';
+                }
+            } catch (error) {
+                console.error('Failed to refresh stats:', error);
+            }
+        }
+        
+        // Rules functions
+        async function loadRules() {
+            try {
+                const rules = await ipcRenderer.invoke('get-rules');
+                const tbody = document.getElementById('rulesTableBody');
+                
+                if (rules.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No rules configured</td></tr>';
+                } else {
+                    tbody.innerHTML = rules.map(rule => `
+                        <tr>
+                            <td>${rule.domain}</td>
+                            <td><span class="status warning">${rule.category}</span></td>
+                            <td>${rule.reason || '-'}</td>
+                            <td>${new Date(rule.created_at).toLocaleString()}</td>
+                            <td>
+                                <button class="btn btn-danger" onclick="deleteRule(${rule.id})">Delete</button>
+                            </td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Failed to load rules:', error);
+            }
+        }
+        
+        async function deleteRule(ruleId) {
+            if (confirm('Are you sure you want to delete this rule?')) {
+                try {
+                    await ipcRenderer.invoke('delete-rule', ruleId);
+                    loadRules(); // Refresh the list
+                } catch (error) {
+                    alert('Failed to delete rule');
+                }
+            }
+        }
+        
+        // Form submission
+        document.getElementById('addRuleForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const rule = {
+                domain: document.getElementById('ruleDomain').value,
+                category: document.getElementById('ruleCategory').value,
+                reason: document.getElementById('ruleReason').value,
+                profile_id: 1
+            };
+            
+            try {
+                await ipcRenderer.invoke('add-rule', rule);
+                document.getElementById('addRuleForm').reset();
+                loadRules(); // Refresh the list
+                alert('Rule added successfully!');
+            } catch (error) {
+                alert('Failed to add rule');
+            }
+        });
+        
+        // Logs functions
+        async function refreshLogs() {
+            try {
+                const logs = await ipcRenderer.invoke('get-logs');
+                const container = document.getElementById('logsContainer');
+                
+                if (logs.length === 0) {
+                    container.innerHTML = '<div style="text-align: center; color: #666;">No logs available</div>';
+                } else {
+                    container.innerHTML = logs.map(log => `
+                        <div class="log-entry log-${log.action}">
+                            <strong>${new Date(log.timestamp).toLocaleTimeString()}</strong> - 
+                            ${log.domain} (${log.query_type}) from ${log.client_ip} - 
+                            <span class="status ${log.action === 'blocked' ? 'danger' : 'success'}">${log.action.toUpperCase()}</span>
+                        </div>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Failed to refresh logs:', error);
+            }
+        }
+        
+        function clearLogs() {
+            if (confirm('Are you sure you want to clear all logs?')) {
+                // Implement clear logs functionality
+                alert('Logs cleared (functionality to be implemented)');
+            }
+        }
+        
+        // System functions
+        async function checkSystemStatus() {
+            try {
+                const status = await ipcRenderer.invoke('get-system-status');
+                
+                // Update hosts file status
+                document.getElementById('hostsStatus').textContent = status.hosts_accessible ? 'Active' : 'Error';
+                document.getElementById('hostsStatus').className = `status ${status.hosts_accessible ? 'success' : 'danger'}`;
+                
+                // Update blocked domains count
+                document.getElementById('blockedCount').textContent = status.blocked_domains || 0;
+                document.getElementById('blockedCount').className = 'status success';
+
+                // Strict mode removed - hosts-only approach
+            } catch (error) {
+                console.error('Failed to check system status:', error);
+                // Set error status
+                document.getElementById('hostsStatus').textContent = 'Error';
+                document.getElementById('hostsStatus').className = 'status danger';
+            }
+        }
+        
+        async function configureSystem() {
+            if (confirm('This will apply all current blocking rules to the hosts file. Continue?')) {
+                try {
+                    const result = await ipcRenderer.invoke('configure-system');
+                    alert(result.message || 'Rules applied to hosts file successfully!');
+                    checkSystemStatus();
+                } catch (error) {
+                    alert('Failed to apply rules to hosts file');
+                }
+            }
+        }
+        
+        async function restoreSystem() {
+            if (confirm('This will restore the original hosts file and remove all KidSafe blocking rules. Continue?')) {
+                try {
+                    const result = await ipcRenderer.invoke('restore-system');
+                    alert(result.message || 'Original hosts file restored successfully!');
+                    checkSystemStatus();
+                } catch (error) {
+                    alert('Failed to restore hosts file');
+                }
+            }
+        }
+        
+        async function restartService() {
+            if (confirm('This will restart the core service. Continue?')) {
+                try {
+                    const result = await ipcRenderer.invoke('restart-core-service');
+                    alert(result.message || 'Service restarted successfully!');
+                } catch (error) {
+                    alert('Failed to restart service');
+                }
+            }
+        }
+
+        // Debug functions
+        async function verifyHosts() {
+            try {
+                const response = await fetch('http://127.0.0.1:8081/api/v1/system/verify-hosts');
+                const result = await response.json();
+                
+                const debugDiv = document.getElementById('debugResults');
+                debugDiv.style.display = 'block';
+                debugDiv.innerHTML = `
+                    <strong>Hosts File Verification:</strong><br>
+                    Found domains in hosts file:<br>
+                    ${Object.entries(result.found_domains || {}).map(([domain, blocked]) => 
+                        `${domain}: ${blocked ? '✅ BLOCKED' : '❌ NOT BLOCKED'}`
+                    ).join('<br>')}
+                `;
+            } catch (error) {
+                alert('Failed to verify hosts file: ' + error.message);
+            }
+        }
+
+        async function testBlocking() {
+            const domain = document.getElementById('testDomain').value.trim();
+            if (!domain) {
+                alert('Please enter a domain to test');
+                return;
+            }
+
+            try {
+                const response = await fetch(`http://127.0.0.1:8081/api/v1/system/test-blocking/${encodeURIComponent(domain)}`);
+                const result = await response.json();
+                
+                const debugDiv = document.getElementById('debugResults');
+                debugDiv.style.display = 'block';
+                debugDiv.innerHTML = `
+                    <strong>Blocking Test for: ${result.domain}</strong><br>
+                    Status: ${result.is_blocked ? '🚫 BLOCKED' : '✅ ALLOWED'}<br>
+                    Expected IP: ${result.expected_ip}<br>
+                    <br>
+                    <em>Note: If domain is blocked but you can still access it in browser, 
+                    try clearing browser cache or use incognito mode.</em>
+                `;
+            } catch (error) {
+                alert('Failed to test blocking: ' + error.message);
+            }
+        }
+
+        // Strict mode toggle removed - simplified hosts-only approach
+        
+        // Initialize dashboard on load
+        document.addEventListener('DOMContentLoaded', () => {
+            refreshStats();
+        });
+        
+        // Auto-refresh logs every 5 seconds when on logs tab
+        setInterval(() => {
+            if (document.getElementById('logs').classList.contains('active')) {
+                refreshLogs();
+            }
+        }, 5000);
+    </script>
+</body>
+</html>

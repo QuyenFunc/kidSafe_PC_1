@@ -1,0 +1,89 @@
+@startuml KidSafe PC Use Case Diagram
+
+left to right direction
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+
+actor "Phụ huynh" as Parent <<Human>>
+actor "Trẻ em" as Child <<Human>>
+actor "Hệ thống Windows" as System <<System>>
+
+rectangle "KidSafe PC System" {
+  package "Authentication" {
+    usecase "Đăng nhập" as Login
+    usecase "Đăng ký tài khoản" as Register
+    usecase "Quản lý phiên đăng nhập" as SessionManagement
+  }
+  
+  package "URL Management" {
+    usecase "Thêm URL bị chặn" as AddBlockedURL
+    usecase "Xóa URL bị chặn" as RemoveBlockedURL
+    usecase "Xem danh sách URL bị chặn" as ViewBlockedURLs
+    usecase "Tìm kiếm URL" as SearchURL
+  }
+  
+  package "System Control" {
+    usecase "Bật/tắt chế độ chặn" as ToggleBlocking
+    usecase "Cấu hình profile" as ConfigureProfile
+    usecase "Xem báo cáo truy cập" as ViewReports
+    usecase "Xuất/nhập cấu hình" as ImportExport
+  }
+  
+  package "Website Access" {
+    usecase "Truy cập website" as AccessWebsite
+    usecase "Xem trang bị chặn" as ViewBlockedPage
+    usecase "Ghi log truy cập" as LogAccess
+  }
+  
+  package "Synchronization" {
+    usecase "Đồng bộ dữ liệu Android-PC" as SyncData
+    usecase "Cập nhật hosts file" as UpdateHosts
+    usecase "Flush DNS cache" as FlushDNS
+    usecase "Real-time notification" as RealTimeNotify
+  }
+  
+  package "System Maintenance" {
+    usecase "Khởi động dịch vụ" as StartService
+    usecase "Dừng dịch vụ" as StopService
+    usecase "Kiểm tra trạng thái" as CheckStatus
+    usecase "Khôi phục cấu hình" as RestoreConfig
+  }
+}
+
+' Parent relationships
+Parent --> Login
+Parent --> Register
+Parent --> AddBlockedURL
+Parent --> RemoveBlockedURL
+Parent --> ViewBlockedURLs
+Parent --> SearchURL
+Parent --> ToggleBlocking
+Parent --> ConfigureProfile
+Parent --> ViewReports
+Parent --> ImportExport
+Parent --> SyncData
+Parent --> StartService
+Parent --> StopService
+Parent --> CheckStatus
+Parent --> RestoreConfig
+
+' Child relationships
+Child --> AccessWebsite
+Child --> ViewBlockedPage
+
+' System relationships
+System --> UpdateHosts
+System --> FlushDNS
+System --> LogAccess
+System --> RealTimeNotify
+System --> SessionManagement
+
+' Include relationships
+AddBlockedURL ..> SyncData : <<include>>
+RemoveBlockedURL ..> SyncData : <<include>>
+SyncData ..> UpdateHosts : <<include>>
+UpdateHosts ..> FlushDNS : <<include>>
+AccessWebsite ..> LogAccess : <<include>>
+AccessWebsite ..> ViewBlockedPage : <<extend>>
+
+@enduml

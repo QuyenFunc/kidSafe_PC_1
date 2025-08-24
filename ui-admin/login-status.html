@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KidSafe PC - Login Status</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #ff6b6b, #4ecdc4, #45b7d1, #f39c12);
+            background-size: 400% 100%;
+            animation: gradient 3s ease infinite;
+        }
+
+        @keyframes gradient {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        .logo {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: bold;
+        }
+
+        .status-card {
+            margin: 30px 0;
+            padding: 25px;
+            border-radius: 15px;
+            border: 1px solid #e0e0e0;
+            transition: all 0.3s ease;
+        }
+
+        .status-logged-in {
+            background: linear-gradient(135deg, #d4edda, #c3e6cb);
+            border-color: #b1dfbb;
+        }
+
+        .status-logged-out {
+            background: linear-gradient(135deg, #f8d7da, #f1b0b7);
+            border-color: #f5c6cb;
+        }
+
+        .status-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+
+        .status-text {
+            font-size: 1.2em;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .user-info {
+            background: rgba(255, 255, 255, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+        }
+
+        .user-email {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .user-uid {
+            font-size: 0.9em;
+            color: #7f8c8d;
+            font-family: monospace;
+            word-break: break-all;
+        }
+
+        .firebase-status {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.5);
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-size: 0.9em;
+        }
+
+        .firebase-connected {
+            background: rgba(46, 204, 113, 0.2);
+        }
+
+        .firebase-disconnected {
+            background: rgba(231, 76, 60, 0.2);
+        }
+
+        .refresh-btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+        }
+
+        .refresh-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .timestamp {
+            font-size: 0.8em;
+            color: #95a5a6;
+            margin-top: 15px;
+        }
+
+        .loading {
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .auto-refresh {
+            font-size: 0.8em;
+            color: #7f8c8d;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🛡️ KidSafe PC</div>
+        
+        <div id="status-container" class="loading">
+            <div class="status-card">
+                <div class="status-icon">⏳</div>
+                <div class="status-text">Đang kiểm tra trạng thái...</div>
+            </div>
+        </div>
+
+        <button class="refresh-btn" onclick="checkStatus()">🔄 Refresh</button>
+        
+        <div class="timestamp" id="timestamp"></div>
+        <div class="auto-refresh">🔄 Tự động refresh mỗi 30 giây</div>
+    </div>
+
+    <script>
+        let refreshInterval;
+
+        async function checkStatus() {
+            const container = document.getElementById('status-container');
+            const timestamp = document.getElementById('timestamp');
+            
+            container.classList.add('loading');
+            
+            try {
+                // Try the new auth endpoint first, fallback to system status
+                let response;
+                try {
+                    response = await fetch('http://127.0.0.1:8081/api/v1/auth/status');
+                } catch (e) {
+                    response = await fetch('http://127.0.0.1:8081/api/v1/system/status');
+                }
+                
+                if (!response.ok) {
+                    throw new Error('Service không phản hồi');
+                }
+                
+                const data = await response.json();
+                updateUI(data);
+                
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                container.classList.remove('loading');
+                timestamp.textContent = `Cập nhật lần cuối: ${new Date().toLocaleString('vi-VN')}`;
+            }
+        }
+
+        function updateUI(data) {
+            const container = document.getElementById('status-container');
+            
+            // Check if this is the new auth API response or old system status
+            const isAuthenticated = data.authenticated !== undefined ? 
+                data.authenticated : 
+                (data.auth_status === 'authenticated');
+            
+            const userInfo = data.user || {
+                email: data.user_email,
+                uid: data.user_uid
+            };
+            
+            if (isAuthenticated && userInfo.email) {
+                container.innerHTML = `
+                    <div class="status-card status-logged-in">
+                        <div class="status-icon">✅</div>
+                        <div class="status-text">${data.status || '🟢 ĐĂNG NHẬP THÀNH CÔNG'}</div>
+                        <div class="user-info">
+                            <div class="user-email">👤 ${userInfo.email}</div>
+                            <div class="user-uid">🆔 ${userInfo.uid}</div>
+                        </div>
+                        ${data.firebase ? createFirebaseStatus(data.firebase) : ''}
+                    </div>
+                `;
+            } else {
+                container.innerHTML = `
+                    <div class="status-card status-logged-out">
+                        <div class="status-icon">❌</div>
+                        <div class="status-text">${data.status || '🔴 CHƯA ĐĂNG NHẬP'}</div>
+                        <p>${data.message || 'Vui lòng đăng nhập để đồng bộ với Firebase'}</p>
+                        ${data.firebase ? createFirebaseStatus(data.firebase) : ''}
+                    </div>
+                `;
+            }
+        }
+
+        function createFirebaseStatus(firebase) {
+            const statusClass = firebase.connected ? 'firebase-connected' : 'firebase-disconnected';
+            const statusIcon = firebase.connected ? '🟢' : '🔴';
+            const statusText = firebase.connected ? 'Connected' : 'Disconnected';
+            
+            return `
+                <div class="firebase-status ${statusClass}">
+                    <span>${statusIcon} Firebase: ${statusText}</span>
+                    <span>Sync: ${firebase.sync_count || 0} URLs</span>
+                </div>
+            `;
+        }
+
+        function showError(message) {
+            const container = document.getElementById('status-container');
+            container.innerHTML = `
+                <div class="status-card status-logged-out">
+                    <div class="status-icon">⚠️</div>
+                    <div class="status-text">Lỗi kết nối</div>
+                    <p>${message}</p>
+                    <p><small>Kiểm tra xem KidSafe PC có đang chạy không (Port 8081)</small></p>
+                </div>
+            `;
+        }
+
+        function startAutoRefresh() {
+            if (refreshInterval) clearInterval(refreshInterval);
+            refreshInterval = setInterval(checkStatus, 30000); // 30 seconds
+        }
+
+        // Initialize
+        checkStatus();
+        startAutoRefresh();
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (refreshInterval) clearInterval(refreshInterval);
+        });
+    </script>
+</body>
+</html>

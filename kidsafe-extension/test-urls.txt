@@ -1,0 +1,23 @@
+Test URLs for KidSafe PC Extension:
+
+1. Direct IP test:
+   http://127.0.0.1/test
+
+2. Localhost test:
+   http://localhost/test
+
+3. Known blocked domains:
+   https://jeff.vn
+   https://www.jeff.vn
+   https://vnexpress.net
+   https://www.vnexpress.net
+
+4. Test error page:
+   https://thissitedoesnotexist12345.com
+
+Instructions:
+1. Open Chrome Developer Tools (F12)
+2. Go to Console tab
+3. Visit each URL above
+4. Look for "KidSafe PC: Content script loaded" messages
+5. Check if blocked page is shown

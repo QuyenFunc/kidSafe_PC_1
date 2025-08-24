@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parental Control Admin</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h2><i class="fas fa-shield-alt"></i> KidSafe PC</h2>
+                <p>Parental Control System</p>
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item active" data-section="dashboard">
+                    <i class="fas fa-home"></i> Dashboard
+                </li>
+                <li class="nav-item" data-section="rules">
+                    <i class="fas fa-ban"></i> Block Rules
+                </li>
+                <li class="nav-item" data-section="logs">
+                    <i class="fas fa-list"></i> DNS Logs
+                </li>
+                <li class="nav-item" data-section="system-status">
+                    <i class="fas fa-cogs"></i> System Status
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="header">
+                <h1 id="page-title">Dashboard</h1>
+                <div class="header-actions">
+                    <!-- User Account Info -->
+                    <div class="user-account" id="user-account">
+                        <div class="user-info">
+                            <i class="fas fa-user-circle"></i>
+                            <span id="user-status">Checking login...</span>
+                        </div>
+                        <div class="firebase-sync" id="firebase-sync">
+                            <i class="fas fa-cloud"></i>
+                            <span id="sync-status">Checking sync...</span>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" id="refresh-btn">
+                        <i class="fas fa-sync"></i> Refresh
+                    </button>
+                </div>
+            </header>
+
+            <div class="content-area">
+                <!-- System Status Section -->
+                <section id="system-status" class="content-section">
+    <div class="system-status-container">
+                        <h2><i class="fas fa-cogs"></i> System Status</h2>
+        
+        <div class="status-grid">
+                            <div class="status-card" id="hosts-status">
+                <div class="status-icon">
+                                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <div class="status-content">
+                                    <h3>Hosts File</h3>
+                                    <p id="hosts-status-text">Checking...</p>
+                                    <p class="status-details" id="hosts-details"></p>
+                </div>
+            </div>
+            
+                            <div class="status-card" id="firebase-status">
+                <div class="status-icon">
+                                    <i class="fas fa-cloud"></i>
+                </div>
+                <div class="status-content">
+                                    <h3>Firebase Sync</h3>
+                                    <p id="firebase-status-text">Checking...</p>
+                                    <p class="status-details" id="firebase-details"></p>
+                </div>
+            </div>
+            
+                            <div class="status-card" id="auth-status">
+                <div class="status-icon">
+                                    <i class="fas fa-user-shield"></i>
+                </div>
+                <div class="status-content">
+                                    <h3>Authentication</h3>
+                                    <p id="auth-status-text">Checking...</p>
+                                    <p class="status-details" id="auth-details"></p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="system-actions">
+                            <button class="btn btn-success" id="configure-system-btn">
+                                <i class="fas fa-cogs"></i> Configure System
+            </button>
+            <button class="btn btn-warning" id="restore-system-btn">
+                                <i class="fas fa-undo"></i> Restore System
+            </button>
+            <button class="btn btn-info" id="check-status-btn">
+                                <i class="fas fa-sync"></i> Refresh Status
+            </button>
+            <button class="btn btn-primary" id="force-firebase-sync-btn">
+                                <i class="fas fa-cloud-download-alt"></i> Force Firebase Sync
+            </button>
+        </div>
+    </div>
+</section>
+                <!-- Dashboard Section -->
+                <section id="dashboard" class="content-section active">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-ban"></i>
+                            </div>
+                            <div class="stat-content">
+                                <h3 id="total-rules">0</h3>
+                                <p>Active Rules</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-shield-alt"></i>
+                            </div>
+                            <div class="stat-content">
+                                <h3 id="blocked-today">0</h3>
+                                <p>Blocked Today</p>
+                            </div>
+                        </div>
+                        <div class="stat-card" id="firebase-stat">
+                            <div class="stat-icon">
+                                <i class="fas fa-cloud"></i>
+                            </div>
+                            <div class="stat-content">
+                                <h3 id="firebase-sync-count">0</h3>
+                                <p>Firebase Synced</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-charts">
+                        <div class="chart-container">
+                            <h3>Top Blocked Domains (Last 7 Days)</h3>
+                            <div id="top-blocked-list" class="top-blocked-list">
+                                <!-- Dynamically populated -->
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Block Rules Section -->
+                <section id="rules" class="content-section">
+                    <div class="section-header">
+                        <h2>Block Rules</h2>
+                        <div class="header-buttons">
+                            <button class="btn btn-info" id="refresh-firebase-btn">
+                                <i class="fas fa-cloud-download-alt"></i> Sync Firebase
+                            </button>
+                            <button class="btn btn-success" id="add-rule-btn">
+                                <i class="fas fa-plus"></i> Add Rule
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="table-container">
+                        <table class="data-table" id="rules-table">
+                            <thead>
+                                <tr>
+                                    <th>Domain</th>
+                                    <th>Category</th>
+                                    <th>Reason</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Dynamically populated -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- DNS Logs Section -->
+                <section id="logs" class="content-section">
+                    <div class="section-header">
+                        <h2>DNS Query Logs</h2>
+                        <div class="filter-controls">
+                            <select id="log-filter">
+                                <option value="all">All Actions</option>
+                                <option value="blocked">Blocked Only</option>
+                                <option value="allowed">Allowed Only</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="table-container">
+                        <table class="data-table" id="logs-table">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Domain</th>
+                                    <th>Client IP</th>
+                                    <th>Query Type</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Dynamically populated -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="add-rule-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Add Block Rule</h2>
+            <form id="add-rule-form">
+                <div class="form-group">
+                    <label for="rule-domain">Domain:</label>
+                    <input type="text" id="rule-domain" required placeholder="example.com">
+                </div>
+                <div class="form-group">
+                    <label for="rule-category">Category:</label>
+                    <select id="rule-category">
+                        <option value="violence">Violence</option>
+                        <option value="gambling">Gambling</option>
+                        <option value="adult">Adult Content</option>
+                        <option value="social">Social Media</option>
+                        <option value="gaming">Gaming</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="rule-reason">Reason:</label>
+                    <textarea id="rule-reason" placeholder="Why block this domain?"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Add Rule</button>
+                    <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="renderer.js"></script>
+</body>
+</html>

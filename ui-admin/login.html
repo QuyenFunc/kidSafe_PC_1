@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KidSafe PC - Đăng nhập</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+            overflow: hidden;
+        }
+
+        .login-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 60px 50px;
+            max-width: 450px;
+            width: 90%;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .login-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background: linear-gradient(90deg, #ff6b6b, #4ecdc4, #45b7d1, #f39c12);
+            background-size: 400% 100%;
+            animation: gradient 3s ease infinite;
+        }
+
+        @keyframes gradient {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .logo-icon {
+            font-size: 4em;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .logo h1 {
+            font-size: 2.2em;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 5px;
+        }
+
+        .logo p {
+            color: #666;
+            font-size: 1.1em;
+            font-weight: 500;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+            position: relative;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+            font-size: 1em;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 16px 20px;
+            border: 2px solid #e1e8ed;
+            border-radius: 12px;
+            font-size: 1em;
+            transition: all 0.3s ease;
+            background: #fff;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            transform: translateY(-1px);
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .login-btn:active {
+            transform: translateY(0);
+        }
+
+        .login-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status-message {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            font-weight: 500;
+            display: none;
+        }
+
+        .status-message.success {
+            background: rgba(46, 204, 113, 0.1);
+            color: #27ae60;
+            border: 1px solid rgba(46, 204, 113, 0.3);
+        }
+
+        .status-message.error {
+            background: rgba(231, 76, 60, 0.1);
+            color: #e74c3c;
+            border: 1px solid rgba(231, 76, 60, 0.3);
+        }
+
+        .status-message.info {
+            background: rgba(52, 152, 219, 0.1);
+            color: #3498db;
+            border: 1px solid rgba(52, 152, 219, 0.3);
+        }
+
+        .loading-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            display: inline-block;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .footer-info {
+            text-align: center;
+            margin-top: 30px;
+            color: #888;
+            font-size: 0.9em;
+        }
+
+        .footer-info a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .firebase-info {
+            background: rgba(255, 193, 7, 0.1);
+            border: 1px solid rgba(255, 193, 7, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 25px;
+            color: #856404;
+            font-size: 0.9em;
+            text-align: center;
+        }
+
+        .service-status {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: 600;
+        }
+
+        .service-status.online {
+            background: rgba(46, 204, 113, 0.2);
+            color: #27ae60;
+        }
+
+        .service-status.offline {
+            background: rgba(231, 76, 60, 0.2);
+            color: #e74c3c;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="service-status" id="service-status">🔄 Checking...</div>
+        
+        <div class="logo">
+            <span class="logo-icon">🛡️</span>
+            <h1>KidSafe PC</h1>
+            <p>Parental Control System</p>
+        </div>
+
+        <div class="firebase-info">
+            <strong>🔐 Firebase Authentication</strong><br>
+            Đăng nhập với tài khoản đã sử dụng trên ứng dụng Android
+        </div>
+
+        <form id="login-form">
+            <div class="form-group">
+                <label for="email">📧 Email:</label>
+                <input type="email" id="email" placeholder="your@email.com" required>
+            </div>
+
+            <div class="form-group">
+                <label for="password">🔑 Mật khẩu:</label>
+                <input type="password" id="password" placeholder="Nhập mật khẩu" required>
+            </div>
+
+            <button type="submit" class="login-btn" id="login-btn">
+                Đăng nhập Firebase
+            </button>
+        </form>
+
+        <div class="status-message" id="status-message"></div>
+
+        <div class="footer-info">
+            <p>🔒 Thông tin đăng nhập được bảo mật</p>
+            <p>💡 Cần giúp đỡ? <a href="#" onclick="showHelp()">Hướng dẫn setup</a></p>
+        </div>
+    </div>
+
+    <script>
+        const { ipcRenderer } = require('electron');
+
+        let isLoggingIn = false;
+
+        // Check service status on load
+        checkServiceStatus();
+        setInterval(checkServiceStatus, 5000);
+
+        // Login form handler
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (isLoggingIn) return;
+            
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            
+            if (!email || !password) {
+                showMessage('Vui lòng nhập đầy đủ email và mật khẩu', 'error');
+                return;
+            }
+
+            await loginUser(email, password);
+        });
+
+        async function loginUser(email, password) {
+            isLoggingIn = true;
+            const loginBtn = document.getElementById('login-btn');
+            
+            // Update UI for loading state
+            loginBtn.disabled = true;
+            loginBtn.innerHTML = '<span class="loading-spinner"></span>Đang đăng nhập...';
+            
+            showMessage('Đang xác thực với Firebase...', 'info');
+
+            try {
+                // Send login request to main process
+                const result = await ipcRenderer.invoke('firebase-login', { email, password });
+                
+                if (result.success) {
+                    showMessage('✅ Đăng nhập thành công!', 'success');
+                    
+                    // Save credentials for auto-login
+                    await ipcRenderer.invoke('save-user-credentials', { email, password });
+                    
+                    // Immediately notify success and close window
+                    ipcRenderer.send('login-success', {
+                        email,
+                        uid: result.uid
+                    });
+                    
+                    // Close login window quickly
+                    setTimeout(() => {
+                        window.close();
+                    }, 500);
+                } else {
+                    showMessage('❌ Đăng nhập thất bại: ' + (result.error || 'Lỗi không xác định'), 'error');
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                showMessage('❌ Lỗi kết nối: ' + error.message, 'error');
+            } finally {
+                isLoggingIn = false;
+                loginBtn.disabled = false;
+                loginBtn.innerHTML = 'Đăng nhập Firebase';
+            }
+        }
+
+        async function checkServiceStatus() {
+            try {
+                const response = await fetch('http://127.0.0.1:8081/api/v1/system/status');
+                if (response.ok) {
+                    updateServiceStatus('online');
+                } else {
+                    updateServiceStatus('offline');
+                }
+            } catch (error) {
+                updateServiceStatus('offline');
+            }
+        }
+
+        function updateServiceStatus(status) {
+            const statusEl = document.getElementById('service-status');
+            if (status === 'online') {
+                statusEl.className = 'service-status online';
+                statusEl.textContent = '🟢 Service Online';
+            } else {
+                statusEl.className = 'service-status offline';
+                statusEl.textContent = '🔴 Service Offline';
+            }
+        }
+
+        function showMessage(message, type) {
+            const statusDiv = document.getElementById('status-message');
+            statusDiv.textContent = message;
+            statusDiv.className = `status-message ${type}`;
+            statusDiv.style.display = 'block';
+            
+            if (type === 'success') {
+                setTimeout(() => {
+                    statusDiv.style.display = 'none';
+                }, 3000);
+            }
+        }
+
+        function showHelp() {
+            ipcRenderer.send('show-help');
+        }
+
+        // Auto-fill email if available
+        ipcRenderer.invoke('get-saved-email').then(email => {
+            if (email) {
+                document.getElementById('email').value = email;
+                document.getElementById('password').focus();
+            }
+        });
+    </script>
+</body>
+</html>    </script>
+</body>
+</html>

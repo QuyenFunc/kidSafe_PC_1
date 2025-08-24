@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>KidSafe PC Extension Test</title>
+</head>
+<body>
+    <h1>KidSafe PC Extension Test Page</h1>
+    
+    <button onclick="testExtension()">Test Extension Now</button>
+    
+    <script>
+        function testExtension() {
+            // Simulate blocked page
+            document.title = 'NET::ERR_CERT_AUTHORITY_INVALID';
+            document.body.innerHTML = `
+                <h1>This Website is Protected</h1>
+                <div class="cute-animals">🐰 🐯 🐼 🦄</div>
+                <div class="message">
+                    Hello little friend! This website is not suitable for you and has been protected by your parents to keep you safe.
+                </div>
+                <div class="domain">${window.location.hostname}</div>
+            `;
+            
+            console.log('KidSafe PC Test: Simulated blocked page');
+        }
+        
+        // Check if extension is loaded
+        console.log('KidSafe PC Test Page loaded');
+        console.log('Current URL:', window.location.href);
+        console.log('Current hostname:', window.location.hostname);
+    </script>
+</body>
+</html>
