@@ -29,6 +29,7 @@ type FirebaseService struct {
 	isListening  bool
 	mutex        sync.Mutex
 	blockedUrls  map[string]*BlockedUrl
+	timeRules    map[string]*AndroidTimeRule // Track time rules from Android
 }
 
 // BlockedUrl represents a URL blocked by the parent app
@@ -38,6 +39,20 @@ type BlockedUrl struct {
 	AddedAt int64  `json:"addedAt"`
 	AddedBy string `json:"addedBy"`
 	Status  string `json:"status"`
+}
+
+// AndroidTimeRule represents a time rule from Android app
+type AndroidTimeRule struct {
+	Active               bool   `json:"active"`
+	AddedBy              string `json:"addedBy"`
+	BreakDurationMinutes int    `json:"breakDurationMinutes"`
+	BreakIntervalMinutes int    `json:"breakIntervalMinutes"`
+	CreatedAt            int64  `json:"createdAt"`
+	DailyLimitMinutes    int    `json:"dailyLimitMinutes"`
+	Description          string `json:"description"`
+	Name                 string `json:"name"`
+	RuleType             string `json:"ruleType"`
+	UpdatedAt            int64  `json:"updatedAt"`
 }
 
 // PCStatus represents the status of the PC application
@@ -84,6 +99,7 @@ func NewFirebaseService(credentialsPath string, userUID string, hostsManager *Ho
 		cancel:       cancel,
 		isListening:  false,
 		blockedUrls:  make(map[string]*BlockedUrl),
+		timeRules:    make(map[string]*AndroidTimeRule),
 	}
 
 	log.Printf("Firebase service initialized for user: %s", userUID)
@@ -106,6 +122,9 @@ func (fs *FirebaseService) Start() error {
 
 	// Start listening for blocked URLs changes
 	go fs.listenForBlockedUrls()
+
+	// Start listening for time rules changes
+	go fs.listenForTimeRules()
 
 	// Update PC status periodically
 	go fs.updatePCStatusPeriodically()
@@ -194,7 +213,7 @@ func (fs *FirebaseService) optimizedPollingMultiplePaths(paths []string) {
 				}
 
 				// Debug: Also try different data structures
-				if urlsData == nil || len(urlsData) == 0 {
+				if len(urlsData) == 0 {
 					// Try as array structure
 					var urlsArray []*BlockedUrl
 					if err := ref.Get(fs.ctx, &urlsArray); err == nil && len(urlsArray) > 0 {
@@ -216,7 +235,7 @@ func (fs *FirebaseService) optimizedPollingMultiplePaths(paths []string) {
 					}
 				}
 
-				if urlsData != nil && len(urlsData) > 0 {
+				if len(urlsData) > 0 {
 					foundData = urlsData
 					workingPath = path
 
@@ -682,13 +701,23 @@ func (fs *FirebaseService) GetStats() map[string]interface{} {
 	fs.mutex.Lock()
 	defer fs.mutex.Unlock()
 
+	// Count active time rules
+	activeTimeRules := 0
+	for _, rule := range fs.timeRules {
+		if rule != nil && rule.Active {
+			activeTimeRules++
+		}
+	}
+
 	return map[string]interface{}{
-		"family_id":     fs.familyID,
-		"user_email":    fs.userEmail,
-		"is_listening":  fs.isListening,
-		"blocked_count": len(fs.blockedUrls),
-		"last_updated":  time.Now().UnixMilli(),
-		"status":        "connected",
+		"family_id":         fs.familyID,
+		"user_email":        fs.userEmail,
+		"is_listening":      fs.isListening,
+		"blocked_count":     len(fs.blockedUrls),
+		"time_rules_count":  len(fs.timeRules),
+		"active_time_rules": activeTimeRules,
+		"last_updated":      time.Now().UnixMilli(),
+		"status":            "connected",
 	}
 }
 
@@ -726,7 +755,7 @@ func (fs *FirebaseService) ForceSync() error {
 			continue
 		}
 
-		if urlsData != nil && len(urlsData) > 0 {
+		if len(urlsData) > 0 {
 			log.Printf("     ✅ Found %d URLs at this path!", len(urlsData))
 
 			// Process the data
@@ -949,4 +978,240 @@ func (fs *FirebaseService) syncToLocalDatabase(firebaseUrls map[string]*BlockedU
 
 	log.Printf("✅ Firebase sync to local database completed: %d active domains, %d removed", len(activeFirebaseDomains), len(domainsToRemove))
 	return nil
+}
+
+// listenForTimeRules listens for time rules changes from Android app
+func (fs *FirebaseService) listenForTimeRules() {
+	// Build possible paths for time rules
+	possiblePaths := []string{
+		fmt.Sprintf("%s/syncStatus/timeRules", fs.familyID),       // Real Android path structure
+		fmt.Sprintf("kidsafe/families/%s/timeRules", fs.familyID), // Main Firebase Auth UID path
+		fmt.Sprintf("families/%s/timeRules", fs.familyID),         // Alternative structure
+		fmt.Sprintf("users/%s/timeRules", fs.familyID),            // Alternative structure
+	}
+
+	// Add LocalAuth UID path if we have an email
+	if fs.userEmail != "" {
+		localAuthUID := generateLocalAuthUID(fs.userEmail)
+		if localAuthUID != fs.familyID {
+			possiblePaths = append(possiblePaths, fmt.Sprintf("kidsafe/families/%s/timeRules", localAuthUID))
+			log.Printf("🕐 Also checking LocalAuth UID path for time rules: %s", localAuthUID)
+		}
+	}
+
+	log.Printf("🕐 Starting time rules listener for family: %s", fs.familyID)
+	log.Printf("📡 Will check %d paths for time rules...", len(possiblePaths))
+
+	// Debug: Print all paths being checked
+	for i, path := range possiblePaths {
+		log.Printf("   Time Rules Path %d: %s", i+1, path)
+	}
+
+	// Start polling for time rules
+	fs.pollTimeRules(possiblePaths)
+}
+
+// pollTimeRules polls Firebase for time rules changes
+func (fs *FirebaseService) pollTimeRules(paths []string) {
+	pollInterval := 3 * time.Second
+	maxInterval := 30 * time.Second
+
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
+
+	consecutiveNoChanges := 0
+	var activePath string
+	lastRulesHash := ""
+
+	for {
+		select {
+		case <-ticker.C:
+			var foundRules map[string]*AndroidTimeRule
+			var workingPath string
+
+			// Try each path until we find data
+			for _, path := range paths {
+				ref := fs.client.NewRef(path)
+				var rulesData map[string]*AndroidTimeRule
+
+				if err := ref.Get(fs.ctx, &rulesData); err != nil {
+					continue // Try next path
+				}
+
+				if len(rulesData) > 0 {
+					foundRules = rulesData
+					workingPath = path
+
+					// If this is a new working path, log it
+					if activePath != workingPath {
+						log.Printf("✅ Found time rules at path: %s (%d rules)", workingPath, len(rulesData))
+						activePath = workingPath
+
+						// Debug: Print rules found
+						for key, rule := range rulesData {
+							if rule != nil && rule.Active {
+								log.Printf("   Rule %s: %s - daily limit: %d min", key, rule.Name, rule.DailyLimitMinutes)
+							}
+						}
+					}
+					break
+				}
+			}
+
+			if foundRules == nil {
+				consecutiveNoChanges++
+				if consecutiveNoChanges > 10 && pollInterval < maxInterval {
+					pollInterval = time.Duration(float64(pollInterval) * 1.5)
+					if pollInterval > maxInterval {
+						pollInterval = maxInterval
+					}
+					ticker.Reset(pollInterval)
+				}
+				continue
+			}
+
+			// Check if rules have changed (simple hash comparison)
+			currentHash := fs.calculateTimeRulesHash(foundRules)
+			if currentHash != lastRulesHash {
+				log.Printf("🕐 Time rules changed, applying updates...")
+				fs.processTimeRulesUpdate(foundRules)
+				lastRulesHash = currentHash
+				consecutiveNoChanges = 0
+
+				// Reset to fast polling after changes
+				if pollInterval > 3*time.Second {
+					pollInterval = 3 * time.Second
+					ticker.Reset(pollInterval)
+				}
+			} else {
+				consecutiveNoChanges++
+			}
+
+		case <-fs.ctx.Done():
+			log.Println("🕐 Time rules listener stopped")
+			return
+		}
+	}
+}
+
+// calculateTimeRulesHash creates a simple hash of time rules for change detection
+func (fs *FirebaseService) calculateTimeRulesHash(rules map[string]*AndroidTimeRule) string {
+	var hash strings.Builder
+	for key, rule := range rules {
+		if rule != nil {
+			hash.WriteString(fmt.Sprintf("%s:%v:%d:%d:%d:%d",
+				key, rule.Active, rule.DailyLimitMinutes, rule.BreakIntervalMinutes,
+				rule.BreakDurationMinutes, rule.UpdatedAt))
+		}
+	}
+	return hash.String()
+}
+
+// processTimeRulesUpdate processes time rules from Android and applies to TimeManager
+func (fs *FirebaseService) processTimeRulesUpdate(androidRules map[string]*AndroidTimeRule) {
+	fs.mutex.Lock()
+	fs.timeRules = androidRules
+	fs.mutex.Unlock()
+
+	// Convert Android rules to PC format
+	pcRules := fs.convertAndroidRulesToPCFormat(androidRules)
+
+	// Apply to TimeManager if available
+	if fs.coreService != nil && fs.coreService.timeManager != nil {
+		log.Printf("🕐 Applying %d time rules to TimeManager", len(androidRules))
+		fs.coreService.timeManager.UpdateRules(*pcRules)
+	} else {
+		log.Printf("⚠️ TimeManager not available, time rules stored but not applied")
+	}
+}
+
+// convertAndroidRulesToPCFormat converts Android time rules to PC TimeRules format
+func (fs *FirebaseService) convertAndroidRulesToPCFormat(androidRules map[string]*AndroidTimeRule) *TimeRules {
+	// Initialize default rules
+	pcRules := &TimeRules{
+		Weekdays: DayRule{
+			Enabled:              false,
+			DailyLimitMinutes:    0,
+			BreakIntervalMinutes: 0,
+			BreakDurationMinutes: 0,
+			AllowedSlots:         []TimeSlot{},
+		},
+		Weekends: DayRule{
+			Enabled:              false,
+			DailyLimitMinutes:    0,
+			BreakIntervalMinutes: 0,
+			BreakDurationMinutes: 0,
+			AllowedSlots:         []TimeSlot{},
+		},
+	}
+
+	// Process Android rules
+	var hasActiveRules bool
+	var maxDailyLimit int
+	var maxBreakInterval int
+	var maxBreakDuration int
+
+	for _, rule := range androidRules {
+		if rule == nil || !rule.Active {
+			continue
+		}
+
+		hasActiveRules = true
+
+		// Find the most restrictive (highest) values
+		if rule.DailyLimitMinutes > maxDailyLimit {
+			maxDailyLimit = rule.DailyLimitMinutes
+		}
+		if rule.BreakIntervalMinutes > maxBreakInterval {
+			maxBreakInterval = rule.BreakIntervalMinutes
+		}
+		if rule.BreakDurationMinutes > maxBreakDuration {
+			maxBreakDuration = rule.BreakDurationMinutes
+		}
+
+		log.Printf("🕐 Processing rule: %s (type: %s, daily limit: %d min)",
+			rule.Name, rule.RuleType, rule.DailyLimitMinutes)
+	}
+
+	if hasActiveRules {
+		// Apply same rules to both weekdays and weekends for now
+		// TODO: In future, Android could send separate weekend/weekday rules
+		dayRule := DayRule{
+			Enabled:              true,
+			DailyLimitMinutes:    maxDailyLimit,
+			BreakIntervalMinutes: maxBreakInterval,
+			BreakDurationMinutes: maxBreakDuration,
+			AllowedSlots:         []TimeSlot{}, // Default: no time restrictions, only daily limit
+		}
+
+		// If no daily limit is set, allow all day but with breaks
+		if maxDailyLimit == 0 {
+			dayRule.AllowedSlots = []TimeSlot{
+				{StartTime: "00:00", EndTime: "23:59"}, // Allow all day
+			}
+		}
+
+		pcRules.Weekdays = dayRule
+		pcRules.Weekends = dayRule
+
+		log.Printf("🕐 Converted rules: daily limit=%d min, break interval=%d min, break duration=%d min",
+			maxDailyLimit, maxBreakInterval, maxBreakDuration)
+	} else {
+		log.Printf("🕐 No active time rules found")
+	}
+
+	return pcRules
+}
+
+// GetTimeRules returns current time rules from Android
+func (fs *FirebaseService) GetTimeRules() map[string]*AndroidTimeRule {
+	fs.mutex.Lock()
+	defer fs.mutex.Unlock()
+
+	// Return a copy to avoid race conditions
+	result := make(map[string]*AndroidTimeRule)
+	for k, v := range fs.timeRules {
+		result[k] = v
+	}
+	return result
 }

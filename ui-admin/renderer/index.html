@@ -22,6 +22,9 @@
                 <li class="nav-item" data-section="rules">
                     <i class="fas fa-ban"></i> Block Rules
                 </li>
+                <li class="nav-item" data-section="time-management">
+                    <i class="fas fa-clock"></i> Time Management
+                </li>
                 <li class="nav-item" data-section="logs">
                     <i class="fas fa-list"></i> DNS Logs
                 </li>
@@ -184,6 +187,157 @@
                     </div>
                 </section>
 
+                <!-- Time Management Section -->
+                <section id="time-management" class="content-section">
+                    <div class="time-management-container">
+                        <div class="section-header">
+                            <h2><i class="fas fa-clock"></i> Time Management</h2>
+                            <div class="header-buttons">
+                                <button class="btn btn-info" id="refresh-time-btn">
+                                    <i class="fas fa-sync"></i> Refresh
+                                </button>
+                                <button class="btn btn-warning" id="emergency-unlock-btn">
+                                    <i class="fas fa-unlock"></i> Emergency Unlock
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Time Status Overview -->
+                        <div class="time-status-grid">
+                            <div class="time-stat-card" id="network-status-card">
+                                <div class="time-stat-icon">
+                                    <i class="fas fa-wifi"></i>
+                                </div>
+                                <div class="time-stat-content">
+                                    <h3 id="network-status">Checking...</h3>
+                                    <p>Network Status</p>
+                                    <small id="network-reason"></small>
+                                </div>
+                            </div>
+                            
+                            <div class="time-stat-card" id="usage-today-card">
+                                <div class="time-stat-icon">
+                                    <i class="fas fa-clock"></i>
+                                </div>
+                                <div class="time-stat-content">
+                                    <h3 id="usage-today">0 min</h3>
+                                    <p>Usage Today</p>
+                                    <small id="usage-limit"></small>
+                                </div>
+                            </div>
+                            
+                            <div class="time-stat-card" id="break-status-card">
+                                <div class="time-stat-icon">
+                                    <i class="fas fa-pause"></i>
+                                </div>
+                                <div class="time-stat-content">
+                                    <h3 id="break-status">Normal</h3>
+                                    <p>Break Status</p>
+                                    <small id="break-details"></small>
+                                </div>
+                            </div>
+                            
+                            <div class="time-stat-card" id="android-rules-card">
+                                <div class="time-stat-icon">
+                                    <i class="fas fa-mobile-alt"></i>
+                                </div>
+                                <div class="time-stat-content">
+                                    <h3 id="android-rules-count">0</h3>
+                                    <p>Android Rules</p>
+                                    <small id="android-rules-status"></small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Android Time Rules from Firebase -->
+                        <div class="time-section">
+                            <h3><i class="fas fa-mobile-alt"></i> Rules from Android App</h3>
+                            <div class="android-rules-container" id="android-rules-container">
+                                <div class="loading-message">Loading Android rules...</div>
+                            </div>
+                        </div>
+
+                        <!-- Current PC Time Rules -->
+                        <div class="time-section">
+                            <h3><i class="fas fa-desktop"></i> Current PC Time Rules</h3>
+                            <div class="pc-rules-container">
+                                <div class="rule-type-tabs">
+                                    <button class="tab-btn active" data-tab="weekdays">
+                                        <i class="fas fa-briefcase"></i> Weekdays
+                                    </button>
+                                    <button class="tab-btn" data-tab="weekends">
+                                        <i class="fas fa-sun"></i> Weekends
+                                    </button>
+                                </div>
+                                
+                                <div class="rule-content">
+                                    <div class="tab-content active" id="weekdays-content">
+                                        <div class="rule-details" id="weekdays-rules">
+                                            <div class="loading-message">Loading weekday rules...</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="tab-content" id="weekends-content">
+                                        <div class="rule-details" id="weekends-rules">
+                                            <div class="loading-message">Loading weekend rules...</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Manual Controls -->
+                        <div class="time-section">
+                            <h3><i class="fas fa-hand-paper"></i> Manual Controls</h3>
+                            <div class="manual-controls">
+                                <div class="control-group">
+                                    <button class="btn btn-danger" id="manual-block-btn">
+                                        <i class="fas fa-ban"></i> Block Internet Now
+                                    </button>
+                                    <p class="control-description">Immediately block internet access</p>
+                                </div>
+                                
+                                <div class="control-group">
+                                    <button class="btn btn-success" id="manual-unblock-btn">
+                                        <i class="fas fa-unlock"></i> Unblock Internet Now
+                                    </button>
+                                    <p class="control-description">Remove all time-based blocks</p>
+                                </div>
+                                
+                                <div class="control-group">
+                                    <button class="btn btn-warning" id="reset-usage-btn">
+                                        <i class="fas fa-redo"></i> Reset Today's Usage
+                                    </button>
+                                    <p class="control-description">Reset today's usage counter (Admin only)</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Usage Statistics -->
+                        <div class="time-section">
+                            <h3><i class="fas fa-chart-line"></i> Usage Statistics</h3>
+                            <div class="usage-stats">
+                                <div class="stats-item">
+                                    <label>Current Session:</label>
+                                    <span id="current-session">Not started</span>
+                                </div>
+                                <div class="stats-item">
+                                    <label>Time Until Break:</label>
+                                    <span id="time-until-break">N/A</span>
+                                </div>
+                                <div class="stats-item">
+                                    <label>Time Until Limit:</label>
+                                    <span id="time-until-limit">N/A</span>
+                                </div>
+                                <div class="stats-item">
+                                    <label>Last Update:</label>
+                                    <span id="last-time-update">Never</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 <!-- DNS Logs Section -->
                 <section id="logs" class="content-section">
                     <div class="section-header">
@@ -254,5 +408,6 @@
     </div>
 
     <script src="renderer.js"></script>
+    <script src="time-management-fix.js"></script>
 </body>
 </html>

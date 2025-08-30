@@ -50,6 +50,7 @@ type CoreService struct {
 	hostsManager    *HostsManager
 	firebaseService *FirebaseService
 	authService     *AuthService
+	timeManager     *TimeManager
 	blocklist       sync.Map
 	whitelist       sync.Map
 	profiles        sync.Map
@@ -230,9 +231,14 @@ func runConsole() {
 		}
 	}
 
+	// Start TimeManager
+	log.Println("🕐 Starting time management service...")
+	go service.timeManager.StartMonitoring()
+
 	log.Println("✅ KidSafe PC started successfully using hosts-based blocking")
 	log.Printf("📡 API Server: http://localhost:%s", config.APIPort)
 	log.Printf("📊 Blocking %d domains", len(service.hostsManager.GetBlockedDomains()))
+	log.Println("🕐 Time management service active")
 
 	// Don't auto-open browser - Electron app will handle UI
 
@@ -356,6 +362,9 @@ func (m *parentalControlService) Execute(args []string, r <-chan svc.ChangeReque
 		}
 	}
 
+	// Start TimeManager
+	go coreService.timeManager.StartMonitoring()
+
 	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
 
 	for c := range r {
@@ -390,12 +399,23 @@ func NewCoreService(config *Config) (*CoreService, error) {
 		return nil, fmt.Errorf("failed to initialize hosts manager: %v", err)
 	}
 
+	// Initialize TimeManager
+	timeManager := NewTimeManager()
+
 	service := &CoreService{
 		db:           db,
 		config:       config,
 		hostsManager: hostsManager,
+		timeManager:  timeManager,
 		sseClients:   make(map[string]*SSEClient),
 	}
+
+	// Set callback for time manager status changes
+	timeManager.SetStatusChangeCallback(func(blocked bool, reason string) {
+		log.Printf("🕐 TimeManager status change: blocked=%v, reason=%s", blocked, reason)
+		// Broadcast to SSE clients if needed
+		go service.broadcastTimeStatusUpdate(blocked, reason)
+	})
 
 	// Initialize database tables
 	if err := service.initDB(); err != nil {
@@ -932,6 +952,17 @@ func (s *CoreService) StartAPIServer(ctx context.Context) error {
 	// Real-time updates endpoint using Server-Sent Events
 	api.HandleFunc("/events/rules", s.handleRulesSSE).Methods("GET")
 
+	// Time Management endpoints
+	api.HandleFunc("/time/rules", s.handleGetTimeRules).Methods("GET")
+	api.HandleFunc("/time/rules", s.handleUpdateTimeRules).Methods("POST")
+	api.HandleFunc("/time/status", s.handleGetTimeStatus).Methods("GET")
+	api.HandleFunc("/time/usage", s.handleGetTimeUsage).Methods("GET")
+	api.HandleFunc("/time/reset", s.handleResetTimeUsage).Methods("POST")
+	api.HandleFunc("/time/toggle", s.handleToggleTimeBlocking).Methods("POST")
+
+	// Firebase Time Rules endpoints
+	api.HandleFunc("/time/firebase-rules", s.handleGetFirebaseTimeRules).Methods("GET")
+
 	server := &http.Server{
 		Addr:    "127.0.0.1:" + s.config.APIPort,
 		Handler: router,
@@ -1454,6 +1485,12 @@ func (s *CoreService) handleFirebaseStatus(w http.ResponseWriter, r *http.Reques
 func (s *CoreService) Shutdown() {
 	log.Println("Shutting down KidSafe PC...")
 
+	// Stop TimeManager first (this will unblock network)
+	if s.timeManager != nil {
+		log.Println("Stopping TimeManager...")
+		s.timeManager.Stop()
+	}
+
 	// Stop Firebase service
 	if s.firebaseService != nil {
 		log.Println("Stopping Firebase service...")
@@ -1555,8 +1592,7 @@ func openWebUI(port string) {
 
 // showUsage displays help information
 func showUsage() {
-	fmt.Println(`
-🛡️  KIDSAFE PC - PARENTAL CONTROL SERVICE
+	fmt.Println(`🛡️  KIDSAFE PC - PARENTAL CONTROL SERVICE
 ========================================
 
 USAGE:
@@ -1581,9 +1617,9 @@ FEATURES:
   🛡️ Hosts-based domain blocking
   📡 Web API on port 8081
   🌐 Beautiful web interface
+  🕐 Advanced time management with firewall integration
 
-For more info: https://github.com/yourrepo/kidsafe
-`)
+For more info: https://github.com/yourrepo/kidsafe`)
 }
 
 // Handle Firebase login from Electron app
@@ -1893,4 +1929,296 @@ func (s *CoreService) broadcastRulesUpdate() {
 			close(client.channel)
 		}
 	}
+}
+
+// Broadcast time status update to SSE clients
+func (s *CoreService) broadcastTimeStatusUpdate(blocked bool, reason string) {
+	s.sseMutex.RLock()
+	defer s.sseMutex.RUnlock()
+
+	if len(s.sseClients) == 0 {
+		return
+	}
+
+	status := s.timeManager.GetStatus()
+	status["blocked"] = blocked
+	status["reason"] = reason
+
+	message, _ := json.Marshal(map[string]interface{}{
+		"type":   "time_status_update",
+		"status": status,
+	})
+
+	log.Printf("📡 Broadcasting time status update to %d SSE clients", len(s.sseClients))
+
+	// Send to all clients
+	for clientID, client := range s.sseClients {
+		select {
+		case client.channel <- string(message):
+			// Message sent successfully
+		default:
+			// Channel is full, client might be slow - remove it
+			log.Printf("⚠️ Removing slow SSE client: %s", clientID)
+			delete(s.sseClients, clientID)
+			close(client.channel)
+		}
+	}
+}
+
+// === TIME MANAGEMENT API HANDLERS ===
+
+// Get current time rules
+func (s *CoreService) handleGetTimeRules(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	rules := s.timeManager.GetCurrentRules()
+	if rules == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status": "no_rules",
+			"rules":  nil,
+		})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status": "success",
+		"rules":  rules,
+	})
+}
+
+// Update time rules
+func (s *CoreService) handleUpdateTimeRules(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	var newRules TimeRules
+	if err := json.NewDecoder(r.Body).Decode(&newRules); err != nil {
+		http.Error(w, "Invalid JSON format", http.StatusBadRequest)
+		return
+	}
+
+	// Validate rules
+	if err := s.validateTimeRules(&newRules); err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	// Update rules
+	s.timeManager.UpdateRules(newRules)
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "Time rules updated successfully",
+		"rules":   newRules,
+	})
+}
+
+// Get current time status
+func (s *CoreService) handleGetTimeStatus(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if s.timeManager == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "TimeManager not initialized",
+			"status":  nil,
+		})
+		return
+	}
+
+	status := s.timeManager.GetStatus()
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"status":  status,
+	})
+}
+
+// Get time usage statistics
+func (s *CoreService) handleGetTimeUsage(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Get days parameter (default 7)
+	days := r.URL.Query().Get("days")
+	if days == "" {
+		days = "7"
+	}
+
+	// For now, just return today's usage
+	// You can extend this to return multiple days
+	todayUsage := s.timeManager.getTodayUsage()
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":        true,
+		"today_usage":    todayUsage,
+		"requested_days": days,
+		"message":        "Time usage data retrieved",
+	})
+}
+
+// Reset time usage (admin function)
+func (s *CoreService) handleResetTimeUsage(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// This would reset usage data - implement if needed
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "Time usage reset (feature not implemented yet)",
+	})
+}
+
+// Toggle time blocking manually (emergency override)
+func (s *CoreService) handleToggleTimeBlocking(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	var request struct {
+		Action string `json:"action"` // "block" or "unblock"
+		Reason string `json:"reason"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, "Invalid JSON format", http.StatusBadRequest)
+		return
+	}
+
+	var err error
+	var message string
+
+	switch request.Action {
+	case "block":
+		err = s.timeManager.blockNetwork()
+		message = "Network blocked manually"
+	case "unblock":
+		err = s.timeManager.unblockNetwork()
+		message = "Network unblocked manually"
+	default:
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Invalid action. Use 'block' or 'unblock'",
+		})
+		return
+	}
+
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": message,
+		"action":  request.Action,
+	})
+}
+
+// Validate time rules
+func (s *CoreService) validateTimeRules(rules *TimeRules) error {
+	// Validate weekdays rules
+	if err := s.validateDayRule(&rules.Weekdays); err != nil {
+		return fmt.Errorf("weekdays rules invalid: %v", err)
+	}
+
+	// Validate weekends rules
+	if err := s.validateDayRule(&rules.Weekends); err != nil {
+		return fmt.Errorf("weekends rules invalid: %v", err)
+	}
+
+	return nil
+}
+
+// Validate a single day rule
+func (s *CoreService) validateDayRule(rule *DayRule) error {
+	// Validate daily limit (0 = no limit, max 24 hours = 1440 minutes)
+	if rule.DailyLimitMinutes < 0 || rule.DailyLimitMinutes > 1440 {
+		return fmt.Errorf("daily limit must be between 0 and 1440 minutes")
+	}
+
+	// Validate break intervals
+	if rule.BreakIntervalMinutes < 0 || rule.BreakIntervalMinutes > 480 {
+		return fmt.Errorf("break interval must be between 0 and 480 minutes")
+	}
+
+	if rule.BreakDurationMinutes < 0 || rule.BreakDurationMinutes > 120 {
+		return fmt.Errorf("break duration must be between 0 and 120 minutes")
+	}
+
+	// Validate time slots
+	for i, slot := range rule.AllowedSlots {
+		if !s.isValidTimeFormat(slot.StartTime) {
+			return fmt.Errorf("slot %d: invalid start time format '%s' (use HH:MM)", i+1, slot.StartTime)
+		}
+		if !s.isValidTimeFormat(slot.EndTime) {
+			return fmt.Errorf("slot %d: invalid end time format '%s' (use HH:MM)", i+1, slot.EndTime)
+		}
+		if slot.StartTime >= slot.EndTime {
+			return fmt.Errorf("slot %d: start time must be before end time", i+1)
+		}
+	}
+
+	return nil
+}
+
+// Check if time format is valid (HH:MM)
+func (s *CoreService) isValidTimeFormat(timeStr string) bool {
+	_, err := time.Parse("15:04", timeStr)
+	return err == nil
+}
+
+// Get Firebase time rules (from Android app)
+func (s *CoreService) handleGetFirebaseTimeRules(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if s.firebaseService == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success":       false,
+			"error":         "Firebase service not available",
+			"android_rules": nil,
+		})
+		return
+	}
+
+	// Get time rules from Firebase
+	androidRules := s.firebaseService.GetTimeRules()
+
+	// Get current PC rules for comparison
+	pcRules := s.timeManager.GetCurrentRules()
+
+	// Convert to response format
+	var activeRules []map[string]interface{}
+	var inactiveRules []map[string]interface{}
+
+	for key, rule := range androidRules {
+		ruleData := map[string]interface{}{
+			"id":                     key,
+			"name":                   rule.Name,
+			"description":            rule.Description,
+			"rule_type":              rule.RuleType,
+			"daily_limit_minutes":    rule.DailyLimitMinutes,
+			"break_interval_minutes": rule.BreakIntervalMinutes,
+			"break_duration_minutes": rule.BreakDurationMinutes,
+			"added_by":               rule.AddedBy,
+			"created_at":             rule.CreatedAt,
+			"updated_at":             rule.UpdatedAt,
+		}
+
+		if rule.Active {
+			activeRules = append(activeRules, ruleData)
+		} else {
+			inactiveRules = append(inactiveRules, ruleData)
+		}
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":        true,
+		"total_rules":    len(androidRules),
+		"active_rules":   activeRules,
+		"inactive_rules": inactiveRules,
+		"pc_rules":       pcRules,
+		"message":        fmt.Sprintf("Found %d Android time rules (%d active)", len(androidRules), len(activeRules)),
+	})
 }

@@ -6,6 +6,8 @@ let rules = [];
 let logs = [];
 let profiles = [];
 let aiSuggestions = [];
+let timeCountdownInterval = null;
+let timeData = null;
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', async () => {
@@ -266,6 +268,9 @@ async function loadSectionData(section) {
             break;
         case 'rules':
             await loadRules();
+            break;
+        case 'time-management':
+            await loadTimeManagement();
             break;
         case 'logs':
             await loadLogs();
@@ -1103,6 +1108,317 @@ window.testModal = function() {
     showModal('add-rule-modal');
 };
 
+// ============== TIME MANAGEMENT FUNCTIONS ==============
+
+// Load Time Management data
+async function loadTimeManagement() {
+    console.log('Loading Time Management data...');
+    
+    try {
+        // Load time status, Android rules, and PC rules in parallel
+        const [timeStatus, androidRules, pcRules] = await Promise.all([
+            loadTimeStatus(),
+            loadAndroidTimeRules(),
+            loadPCTimeRules()
+        ]);
+        
+        // Display the data
+        displayTimeStatus(timeStatus);
+        displayAndroidRules(androidRules);
+        displayPCRules(pcRules);
+        
+        // Start countdown timer
+        startTimeCountdown(timeStatus);
+        
+        // Initialize tab switching
+        initializeTimeManagementTabs();
+        
+        // Initialize time management event listeners
+        initializeTimeManagementEvents();
+        
+    } catch (error) {
+        console.error('Failed to load Time Management data:', error);
+        showNotification('Failed to load Time Management: ' + error.message, 'error');
+    }
+}
+
+// Load current time status
+async function loadTimeStatus() {
+    try {
+        const data = await apiCall('GET', '/time/status');
+        return data.status;
+    } catch (error) {
+        console.error('Failed to load time status:', error);
+        return null;
+    }
+}
+
+// Load Android time rules from Firebase
+async function loadAndroidTimeRules() {
+    try {
+        const data = await apiCall('GET', '/time/firebase-rules');
+        return data;
+    } catch (error) {
+        console.error('Failed to load Android time rules:', error);
+        return null;
+    }
+}
+
+// Load PC time rules
+async function loadPCTimeRules() {
+    try {
+        const data = await apiCall('GET', '/time/rules');
+        return data.rules;
+    } catch (error) {
+        console.error('Failed to load PC time rules:', error);
+        return null;
+    }
+}
+
+// Display time status with countdown
+function displayTimeStatus(status) {
+    if (!status) {
+        document.getElementById('network-status').textContent = 'Error';
+        document.getElementById('usage-today').textContent = 'Error';
+        document.getElementById('break-status').textContent = 'Error';
+        return;
+    }
+    
+    timeData = status;
+    
+    // Network Status
+    const networkStatus = status.is_blocked ? 'BLOCKED' : 'AVAILABLE';
+    const networkCard = document.getElementById('network-status-card');
+    document.getElementById('network-status').textContent = networkStatus;
+    document.getElementById('network-reason').textContent = status.reason || '';
+    
+    if (status.is_blocked) {
+        networkCard.className = 'time-stat-card blocked';
+    } else {
+        networkCard.className = 'time-stat-card available';
+    }
+    
+    // Usage Today with Countdown
+    const usageToday = status.today_usage || 0;
+    const dailyLimit = status.daily_limit || 0;
+    const remainingMinutes = Math.max(0, dailyLimit - usageToday);
+    
+    updateCountdownDisplay(remainingMinutes);
+    
+    // Break Status
+    const breakStatus = status.is_break_time ? 'BREAK TIME' : 'ACTIVE';
+    document.getElementById('break-status').textContent = breakStatus;
+    document.getElementById('break-details').textContent = status.is_break_time ? 'Taking mandatory break' : 'Normal usage';
+    
+    // Current Session
+    const sessionDuration = status.session_duration || 0;
+    document.getElementById('current-session').textContent = sessionDuration + ' minutes';
+    
+    // Statistics
+    document.getElementById('last-time-update').textContent = new Date().toLocaleTimeString();
+    
+    // Calculate time until break/limit
+    if (status.has_rules && status.current_rule) {
+        const rule = status.current_rule;
+        if (rule.breakIntervalMinutes > 0) {
+            const timeUntilBreak = Math.max(0, rule.breakIntervalMinutes - sessionDuration);
+            document.getElementById('time-until-break').textContent = timeUntilBreak + ' minutes';
+        }
+        
+        document.getElementById('time-until-limit').textContent = remainingMinutes + ' minutes';
+    }
+}
+
+// Update countdown display (real-time countdown)
+function updateCountdownDisplay(totalMinutes) {
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    
+    // Update main usage display
+    const usageTodayElement = document.getElementById('usage-today');
+    if (usageTodayElement && timeData) {
+        const usageToday = timeData.today_usage || 0;
+        const dailyLimit = timeData.daily_limit || 0;
+        
+        // Show countdown format when time is running
+        if (!timeData.is_blocked && dailyLimit > 0) {
+            usageTodayElement.innerHTML = '<div class="countdown-display"><span class="countdown-time">' + hours + 'h ' + minutes + 'm</span><small>remaining today</small></div>';
+        } else {
+            usageTodayElement.textContent = usageToday + '/' + dailyLimit + ' min';
+        }
+    }
+    
+    document.getElementById('usage-limit').textContent = totalMinutes + ' minutes remaining';
+}
+
+// Start real-time countdown timer
+function startTimeCountdown(status) {
+    if (timeCountdownInterval) {
+        clearInterval(timeCountdownInterval);
+    }
+    
+    if (!status || !status.has_rules || status.is_blocked) {
+        return;
+    }
+    
+    const dailyLimit = status.daily_limit || 0;
+    if (dailyLimit === 0) {
+        return;
+    }
+    
+    let remainingMinutes = Math.max(0, dailyLimit - (status.today_usage || 0));
+    
+    timeCountdownInterval = setInterval(() => {
+        if (remainingMinutes > 0 && !timeData?.is_blocked) {
+            remainingMinutes -= 1/60; // Decrease by 1 second
+            updateCountdownDisplay(Math.floor(remainingMinutes));
+            
+            document.getElementById('time-until-limit').textContent = Math.floor(remainingMinutes) + ' minutes';
+            
+            // Change color when getting close to limit
+            const usageCard = document.getElementById('usage-today-card');
+            if (remainingMinutes <= 10) {
+                usageCard.className = 'time-stat-card warning';
+            } else if (remainingMinutes <= 30) {
+                usageCard.className = 'time-stat-card caution';
+            } else {
+                usageCard.className = 'time-stat-card';
+            }
+            
+            // Auto refresh every 5 minutes to sync with server
+            if (Math.floor(remainingMinutes) % 5 === 0) {
+                loadTimeStatus().then(displayTimeStatus);
+            }
+        } else {
+            clearInterval(timeCountdownInterval);
+            updateCountdownDisplay(0);
+            
+            setTimeout(() => {
+                loadTimeStatus().then(displayTimeStatus);
+            }, 1000);
+        }
+    }, 1000); // Update every second
+}
+
+// Display Android rules
+function displayAndroidRules(androidData) {
+    const container = document.getElementById('android-rules-container');
+    const countElement = document.getElementById('android-rules-count');
+    const statusElement = document.getElementById('android-rules-status');
+    
+    if (!androidData || !androidData.success) {
+        container.innerHTML = '<div class="no-rules-message">No Android rules found or Firebase not connected</div>';
+        countElement.textContent = '0';
+        statusElement.textContent = 'Not connected';
+        return;
+    }
+    
+    const activeRules = androidData.active_rules || [];
+    countElement.textContent = activeRules.length.toString();
+    statusElement.textContent = activeRules.length + ' active rules';
+    
+    let html = '';
+    
+    if (activeRules.length === 0) {
+        html = '<div class="no-rules-message">No active time rules from Android app</div>';
+    } else {
+        html = '<div class="android-rules-list">';
+        
+        activeRules.forEach(rule => {
+            html += '<div class="android-rule-card active"><div class="rule-header"><h4>' + rule.name + '</h4><span class="rule-type">' + rule.rule_type + '</span></div><div class="rule-details"><p class="rule-description">' + rule.description + '</p><div class="rule-limits"><div class="limit-item"><i class="fas fa-clock"></i><span>Daily Limit: ' + rule.daily_limit_minutes + ' minutes</span></div></div><div class="rule-meta"><small>Added by: ' + rule.added_by + '</small></div></div></div>';
+        });
+        
+        html += '</div>';
+    }
+    
+    container.innerHTML = html;
+}
+
+// Display PC rules with tabs
+function displayPCRules(rules) {
+    if (!rules) {
+        document.getElementById('weekdays-rules').innerHTML = '<div class="no-rules-message">No PC rules available</div>';
+        document.getElementById('weekends-rules').innerHTML = '<div class="no-rules-message">No PC rules available</div>';
+        return;
+    }
+    
+    displayDayRules(rules.weekdays, 'weekdays-rules');
+    displayDayRules(rules.weekends, 'weekends-rules');
+}
+
+// Display individual day rules
+function displayDayRules(dayRule, containerId) {
+    const container = document.getElementById(containerId);
+    
+    if (!dayRule || !dayRule.enabled) {
+        container.innerHTML = '<div class="no-rules-message">No rules enabled for this period</div>';
+        return;
+    }
+    
+    let html = '<div class="day-rule-details"><div class="rule-status enabled"><i class="fas fa-check-circle"></i><span>Rules Enabled</span></div><div class="rule-limits-grid"><div class="limit-card"><div class="limit-icon"><i class="fas fa-clock"></i></div><div class="limit-content"><h4>Daily Limit</h4><p>' + (dayRule.dailyLimitMinutes > 0 ? dayRule.dailyLimitMinutes + ' minutes' : 'No limit') + '</p></div></div></div></div>';
+    
+    container.innerHTML = html;
+}
+
+// Initialize tab switching for time management
+function initializeTimeManagementTabs() {
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+    
+    tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const targetTab = button.getAttribute('data-tab');
+            
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
+            
+            tabContents.forEach(content => content.classList.remove('active'));
+            document.getElementById(targetTab + '-content').classList.add('active');
+        });
+    });
+}
+
+// Initialize time management event listeners
+function initializeTimeManagementEvents() {
+    const refreshTimeBtn = document.getElementById('refresh-time-btn');
+    if (refreshTimeBtn) {
+        refreshTimeBtn.addEventListener('click', () => {
+            loadTimeManagement();
+            showNotification('Time management data refreshed', 'info');
+        });
+    }
+    
+    const manualBlockBtn = document.getElementById('manual-block-btn');
+    if (manualBlockBtn) {
+        manualBlockBtn.addEventListener('click', async () => {
+            if (!confirm('Block internet access immediately?')) return;
+            
+            try {
+                await apiCall('POST', '/time/toggle', { action: 'block', reason: 'Manual block by admin' });
+                showNotification('Internet access blocked', 'warning');
+                setTimeout(() => loadTimeStatus().then(displayTimeStatus), 1000);
+            } catch (error) {
+                showNotification('Failed to block internet: ' + error.message, 'error');
+            }
+        });
+    }
+    
+    const manualUnblockBtn = document.getElementById('manual-unblock-btn');
+    if (manualUnblockBtn) {
+        manualUnblockBtn.addEventListener('click', async () => {
+            if (!confirm('Unblock internet access immediately?')) return;
+            
+            try {
+                await apiCall('POST', '/time/toggle', { action: 'unblock', reason: 'Manual unblock by admin' });
+                showNotification('Internet access unblocked', 'success');
+                setTimeout(() => loadTimeStatus().then(displayTimeStatus), 1000);
+            } catch (error) {
+                showNotification('Failed to unblock internet: ' + error.message, 'error');
+            }
+        });
+    }
+}
+
 function updateUserAccountUIError() {
     const userAccount = document.getElementById('user-account');
     const userStatus = document.getElementById('user-status');
@@ -1180,3 +1496,314 @@ window.testModal = function() {
     console.log('Testing Add Rule modal...');
     showModal('add-rule-modal');
 };
+
+// ============== TIME MANAGEMENT FUNCTIONS ==============
+
+// Load Time Management data
+async function loadTimeManagement() {
+    console.log('Loading Time Management data...');
+    
+    try {
+        // Load time status, Android rules, and PC rules in parallel
+        const [timeStatus, androidRules, pcRules] = await Promise.all([
+            loadTimeStatus(),
+            loadAndroidTimeRules(),
+            loadPCTimeRules()
+        ]);
+        
+        // Display the data
+        displayTimeStatus(timeStatus);
+        displayAndroidRules(androidRules);
+        displayPCRules(pcRules);
+        
+        // Start countdown timer
+        startTimeCountdown(timeStatus);
+        
+        // Initialize tab switching
+        initializeTimeManagementTabs();
+        
+        // Initialize time management event listeners
+        initializeTimeManagementEvents();
+        
+    } catch (error) {
+        console.error('Failed to load Time Management data:', error);
+        showNotification('Failed to load Time Management: ' + error.message, 'error');
+    }
+}
+
+// Load current time status
+async function loadTimeStatus() {
+    try {
+        const data = await apiCall('GET', '/time/status');
+        return data.status;
+    } catch (error) {
+        console.error('Failed to load time status:', error);
+        return null;
+    }
+}
+
+// Load Android time rules from Firebase
+async function loadAndroidTimeRules() {
+    try {
+        const data = await apiCall('GET', '/time/firebase-rules');
+        return data;
+    } catch (error) {
+        console.error('Failed to load Android time rules:', error);
+        return null;
+    }
+}
+
+// Load PC time rules
+async function loadPCTimeRules() {
+    try {
+        const data = await apiCall('GET', '/time/rules');
+        return data.rules;
+    } catch (error) {
+        console.error('Failed to load PC time rules:', error);
+        return null;
+    }
+}
+
+// Display time status with countdown
+function displayTimeStatus(status) {
+    if (!status) {
+        document.getElementById('network-status').textContent = 'Error';
+        document.getElementById('usage-today').textContent = 'Error';
+        document.getElementById('break-status').textContent = 'Error';
+        return;
+    }
+    
+    timeData = status;
+    
+    // Network Status
+    const networkStatus = status.is_blocked ? 'BLOCKED' : 'AVAILABLE';
+    const networkCard = document.getElementById('network-status-card');
+    document.getElementById('network-status').textContent = networkStatus;
+    document.getElementById('network-reason').textContent = status.reason || '';
+    
+    if (status.is_blocked) {
+        networkCard.className = 'time-stat-card blocked';
+    } else {
+        networkCard.className = 'time-stat-card available';
+    }
+    
+    // Usage Today with Countdown
+    const usageToday = status.today_usage || 0;
+    const dailyLimit = status.daily_limit || 0;
+    const remainingMinutes = Math.max(0, dailyLimit - usageToday);
+    
+    updateCountdownDisplay(remainingMinutes);
+    
+    // Break Status
+    const breakStatus = status.is_break_time ? 'BREAK TIME' : 'ACTIVE';
+    document.getElementById('break-status').textContent = breakStatus;
+    document.getElementById('break-details').textContent = status.is_break_time ? 'Taking mandatory break' : 'Normal usage';
+    
+    // Current Session
+    const sessionDuration = status.session_duration || 0;
+    document.getElementById('current-session').textContent = sessionDuration + ' minutes';
+    
+    // Statistics
+    document.getElementById('last-time-update').textContent = new Date().toLocaleTimeString();
+    
+    // Calculate time until break/limit
+    if (status.has_rules && status.current_rule) {
+        const rule = status.current_rule;
+        if (rule.breakIntervalMinutes > 0) {
+            const timeUntilBreak = Math.max(0, rule.breakIntervalMinutes - sessionDuration);
+            document.getElementById('time-until-break').textContent = timeUntilBreak + ' minutes';
+        }
+        
+        document.getElementById('time-until-limit').textContent = remainingMinutes + ' minutes';
+    }
+}
+
+// Update countdown display (real-time countdown)
+function updateCountdownDisplay(totalMinutes) {
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    
+    // Update main usage display
+    const usageTodayElement = document.getElementById('usage-today');
+    if (usageTodayElement && timeData) {
+        const usageToday = timeData.today_usage || 0;
+        const dailyLimit = timeData.daily_limit || 0;
+        
+        // Show countdown format when time is running
+        if (!timeData.is_blocked && dailyLimit > 0) {
+            usageTodayElement.innerHTML = '<div class="countdown-display"><span class="countdown-time">' + hours + 'h ' + minutes + 'm</span><small>remaining today</small></div>';
+        } else {
+            usageTodayElement.textContent = usageToday + '/' + dailyLimit + ' min';
+        }
+    }
+    
+    document.getElementById('usage-limit').textContent = totalMinutes + ' minutes remaining';
+}
+
+// Start real-time countdown timer
+function startTimeCountdown(status) {
+    if (timeCountdownInterval) {
+        clearInterval(timeCountdownInterval);
+    }
+    
+    if (!status || !status.has_rules || status.is_blocked) {
+        return;
+    }
+    
+    const dailyLimit = status.daily_limit || 0;
+    if (dailyLimit === 0) {
+        return;
+    }
+    
+    let remainingMinutes = Math.max(0, dailyLimit - (status.today_usage || 0));
+    
+    timeCountdownInterval = setInterval(() => {
+        if (remainingMinutes > 0 && !timeData?.is_blocked) {
+            remainingMinutes -= 1/60; // Decrease by 1 second
+            updateCountdownDisplay(Math.floor(remainingMinutes));
+            
+            document.getElementById('time-until-limit').textContent = Math.floor(remainingMinutes) + ' minutes';
+            
+            // Change color when getting close to limit
+            const usageCard = document.getElementById('usage-today-card');
+            if (remainingMinutes <= 10) {
+                usageCard.className = 'time-stat-card warning';
+            } else if (remainingMinutes <= 30) {
+                usageCard.className = 'time-stat-card caution';
+            } else {
+                usageCard.className = 'time-stat-card';
+            }
+            
+            // Auto refresh every 5 minutes to sync with server
+            if (Math.floor(remainingMinutes) % 5 === 0) {
+                loadTimeStatus().then(displayTimeStatus);
+            }
+        } else {
+            clearInterval(timeCountdownInterval);
+            updateCountdownDisplay(0);
+            
+            setTimeout(() => {
+                loadTimeStatus().then(displayTimeStatus);
+            }, 1000);
+        }
+    }, 1000); // Update every second
+}
+
+// Display Android rules
+function displayAndroidRules(androidData) {
+    const container = document.getElementById('android-rules-container');
+    const countElement = document.getElementById('android-rules-count');
+    const statusElement = document.getElementById('android-rules-status');
+    
+    if (!androidData || !androidData.success) {
+        container.innerHTML = '<div class="no-rules-message">No Android rules found or Firebase not connected</div>';
+        countElement.textContent = '0';
+        statusElement.textContent = 'Not connected';
+        return;
+    }
+    
+    const activeRules = androidData.active_rules || [];
+    countElement.textContent = activeRules.length.toString();
+    statusElement.textContent = activeRules.length + ' active rules';
+    
+    let html = '';
+    
+    if (activeRules.length === 0) {
+        html = '<div class="no-rules-message">No active time rules from Android app</div>';
+    } else {
+        html = '<div class="android-rules-list">';
+        
+        activeRules.forEach(rule => {
+            html += '<div class="android-rule-card active"><div class="rule-header"><h4>' + rule.name + '</h4><span class="rule-type">' + rule.rule_type + '</span></div><div class="rule-details"><p class="rule-description">' + rule.description + '</p><div class="rule-limits"><div class="limit-item"><i class="fas fa-clock"></i><span>Daily Limit: ' + rule.daily_limit_minutes + ' minutes</span></div></div><div class="rule-meta"><small>Added by: ' + rule.added_by + '</small></div></div></div>';
+        });
+        
+        html += '</div>';
+    }
+    
+    container.innerHTML = html;
+}
+
+// Display PC rules with tabs
+function displayPCRules(rules) {
+    if (!rules) {
+        document.getElementById('weekdays-rules').innerHTML = '<div class="no-rules-message">No PC rules available</div>';
+        document.getElementById('weekends-rules').innerHTML = '<div class="no-rules-message">No PC rules available</div>';
+        return;
+    }
+    
+    displayDayRules(rules.weekdays, 'weekdays-rules');
+    displayDayRules(rules.weekends, 'weekends-rules');
+}
+
+// Display individual day rules
+function displayDayRules(dayRule, containerId) {
+    const container = document.getElementById(containerId);
+    
+    if (!dayRule || !dayRule.enabled) {
+        container.innerHTML = '<div class="no-rules-message">No rules enabled for this period</div>';
+        return;
+    }
+    
+    let html = '<div class="day-rule-details"><div class="rule-status enabled"><i class="fas fa-check-circle"></i><span>Rules Enabled</span></div><div class="rule-limits-grid"><div class="limit-card"><div class="limit-icon"><i class="fas fa-clock"></i></div><div class="limit-content"><h4>Daily Limit</h4><p>' + (dayRule.dailyLimitMinutes > 0 ? dayRule.dailyLimitMinutes + ' minutes' : 'No limit') + '</p></div></div></div></div>';
+    
+    container.innerHTML = html;
+}
+
+// Initialize tab switching for time management
+function initializeTimeManagementTabs() {
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+    
+    tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const targetTab = button.getAttribute('data-tab');
+            
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
+            
+            tabContents.forEach(content => content.classList.remove('active'));
+            document.getElementById(targetTab + '-content').classList.add('active');
+        });
+    });
+}
+
+// Initialize time management event listeners
+function initializeTimeManagementEvents() {
+    const refreshTimeBtn = document.getElementById('refresh-time-btn');
+    if (refreshTimeBtn) {
+        refreshTimeBtn.addEventListener('click', () => {
+            loadTimeManagement();
+            showNotification('Time management data refreshed', 'info');
+        });
+    }
+    
+    const manualBlockBtn = document.getElementById('manual-block-btn');
+    if (manualBlockBtn) {
+        manualBlockBtn.addEventListener('click', async () => {
+            if (!confirm('Block internet access immediately?')) return;
+            
+            try {
+                await apiCall('POST', '/time/toggle', { action: 'block', reason: 'Manual block by admin' });
+                showNotification('Internet access blocked', 'warning');
+                setTimeout(() => loadTimeStatus().then(displayTimeStatus), 1000);
+            } catch (error) {
+                showNotification('Failed to block internet: ' + error.message, 'error');
+            }
+        });
+    }
+    
+    const manualUnblockBtn = document.getElementById('manual-unblock-btn');
+    if (manualUnblockBtn) {
+        manualUnblockBtn.addEventListener('click', async () => {
+            if (!confirm('Unblock internet access immediately?')) return;
+            
+            try {
+                await apiCall('POST', '/time/toggle', { action: 'unblock', reason: 'Manual unblock by admin' });
+                showNotification('Internet access unblocked', 'success');
+                setTimeout(() => loadTimeStatus().then(displayTimeStatus), 1000);
+            } catch (error) {
+                showNotification('Failed to unblock internet: ' + error.message, 'error');
+            }
+        });
+    }
+}
